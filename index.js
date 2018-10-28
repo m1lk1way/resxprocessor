@@ -1,7 +1,8 @@
+const fs = require('fs');
+const { promisify } = require('util');
 const inquirer = require('inquirer');
 // const program = require('commander');
 // const colors = require('colors');
-const fs = require('fs');
 
 const NEW_LINE = '\r\n';
 const TABSIZE = 4;
@@ -22,10 +23,16 @@ const languages = [
     'tr',
 ];
 
+const readFileAsync = promisify(fs.readFile);
+const openAsync = promisify(fs.open);
+const writeAsync = promisify(fs.write);
+const closeAsync = promisify(fs.close);
+
 const defaultLang = languages[0];
 const getSrcFilePath = (chunkName, lang) => `${SRC_FOLDER}${chunkName}.${lang}.json`;
 
 const regenerateSrc = () => {
+    console.log('regenerating json files');
     const processChunk = chunkName => {
         const defaultLangPath = getSrcFilePath(chunkName, defaultLang);
         fs.readFile(defaultLangPath, (readFileErr, defaultLangData) => {
@@ -155,6 +162,16 @@ const beginInteraction = () => {
         },
     ];
 
+    const yesNo = {
+        yes: 'Yes',
+        no: 'No',
+    };
+    
+    const yesNoList = [
+        { name: yesNo.yes },
+        { name: yesNo.no },
+    ];
+
     const createDefaultLangs = [defaultLang, 'ru'];
     const langList = languages.map(l => ({ name: l }));
 
@@ -185,28 +202,44 @@ const beginInteraction = () => {
     ];
 
     const doAdd = (resxName, keyName, keyLangs, langValPairs) => {
-        keyLangs.forEach(l => {
+        const operations = keyLangs.map(l => {
             const filePath = getSrcFilePath(resxName, l);
-            fs.readFile(filePath, (readLangErr, langData) => {
-                if (readLangErr) throw readLangErr;
-                const content = JSON.parse(langData);
-                const langVal = langValPairs[l];
-                const newLangData = {
-                    ...content,
-                    [keyName]: langVal,
-                };
-                fs.open(filePath, 'w', 666, (langOpenErr, id) => {
-                    if (langOpenErr) throw langOpenErr;
-                    fs.write(id, JSON.stringify(newLangData, null, 4), null, 'utf8', () => {
-                        fs.close(id, () => {
-                            console.log(`${filePath} file is updated`);
-                        });
-                    });
-                });
-            });
+            return readFileAsync(filePath, { encoding: 'utf8' })
+                .then(langData => {
+                    const content = JSON.parse(langData);
+                    const langVal = langValPairs[l];
+                    const newLangData = {
+                        ...content,
+                        [keyName]: langVal,
+                    };
+                    return openAsync(filePath, 'w', 666)
+                        .then(id => (
+                            writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
+                                .then(() => (
+                                    closeAsync(id)
+                                        .then(() => console.log(`${filePath} file is updated`))
+                                ))
+                        ))
+                        .catch(langOpenErr => console.log('ERROR:', langOpenErr));
+                })
+                .catch(readLangErr => console.log('ERROR:', readLangErr));
         });
-        // addScenario(resxName);
-        // TODO: handle DONE state somehow and call ^;
+        Promise.all(operations)
+            .then(() => {
+                inquirer
+                    .prompt({
+                        type: 'list',
+                        name: 'newKey',
+                        message: 'Would you like to add one more key?',
+                        choices: yesNoList,
+                    })
+                    .then(a => {
+                        if (a.newKey === yesNo.yes) {
+                            addScenario(resxName);
+                        }
+                        else (regenerateSrc());
+                    });
+            });
     };
 
     const addScenario = resxName => {
@@ -257,9 +290,18 @@ const beginInteraction = () => {
         });
 };
 
-// TODO: complete 'add new resx' functionality + possibility to add keys on create
-// TODO: remove key in src file if it does not exists in default lang file
-// TODO: not sure: generate absent keys only to dist files instead of generating it into src
-// TODO: + posibility to add keys into file recoursively (add key? => done => add key? => ...)
-// TODO: split all this hell into 3 modules
+beginInteraction();
+
+//                          Functionality:
+// TODO: + 'create new resx' functionality + possibility to add keys on create
+// TODO: + remove key functionality
 // TODO: add d.ts generation
+// TODO: ???rework to classes
+
+//                          Code refactoring:
+// TODO: rework regenerateSrc function and regenerateDist into Pomise-based *To handle done state
+// TODO: split all this hell into 3 modules
+
+//                          Doubtful functionality:
+// TODO: ???generate absent keys only to dist files instead of generating it into src
+// TODO: ???remove file functionality
