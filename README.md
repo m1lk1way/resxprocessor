@@ -1,0 +1,1 @@
+[![Build Status](https://travis-ci.org/m1lk1way/jsonResxGenerator.svg?branch=master)](https://travis-ci.org/m1lk1way/jsonResxGenerator)
