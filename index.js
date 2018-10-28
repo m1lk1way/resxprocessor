@@ -208,7 +208,9 @@ const beginInteraction = () => {
         // addScenario(resxName);
         // TODO: handle DONE state somehow and call ^;
     };
-
+    function a() {
+        
+    }
     const addScenario = resxName => {
         const askForValues = (keyName, keyLangs) => {
             const langValPairs = [];
