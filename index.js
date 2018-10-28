@@ -1,63 +1,56 @@
-"use strict";
 const inquirer = require('inquirer');
-const program = require('commander');
-const colors = require('colors');
+// const program = require('commander');
+// const colors = require('colors');
 const fs = require('fs');
 
-const LINE_END = "\r\n";
+const NEW_LINE = '\r\n';
 const TABSIZE = 4;
-const TAB = new Array(TABSIZE + 1).join(" ");
-const SRC_FOLDER = "./resxSrc/";
-const DIST_FOLDER = "./resxDist/";
-const resourcePrefix = "Resx";
+const TAB = new Array(TABSIZE + 1).join(' ');
+const SRC_FOLDER = './resxSrc/';
+const DIST_FOLDER = './resxDist/';
+const RESX_PREFIX = 'Resx';
 
 const languages = [
-    "en",
-    "ru",
-    "de",
-    "fr",
-    "es",
-    "it",
-    "pl",
-    "sk",
-    "tr",
+    'en',
+    'ru',
+    'de',
+    'fr',
+    'es',
+    'it',
+    'pl',
+    'sk',
+    'tr',
 ];
 
 const defaultLang = languages[0];
 const getSrcFilePath = (chunkName, lang) => `${SRC_FOLDER}${chunkName}.${lang}.json`;
 
 const regenerateSrc = () => {
-    fs.readdir(SRC_FOLDER, (err, fileNames) => {
-        const chunksNames = fileNames
-                        .map(fn => fn.split('.')[0])
-                        .filter((v, i, a) => a.indexOf(v) === i)
-                        .forEach(chunkName => processChunk(chunkName))
-    });
+    const processChunk = chunkName => {
+        const defaultLangPath = getSrcFilePath(chunkName, defaultLang);
+        fs.readFile(defaultLangPath, (readFileErr, defaultLangData) => {
+            if (readFileErr) throw readFileErr;
 
-    const processChunk = (chunkName) => {
-        fs.readFile(getSrcFilePath(chunkName, defaultLang), (err, data) => {
-            if (err) throw err;
-            
-            const mainLangData = JSON.parse(data);
+            const mainLangData = JSON.parse(defaultLangData);
             const mainLangKeys = Object.keys(mainLangData);
-            languages.filter(lang => lang != defaultLang).forEach(currentLang => {
-                const filePath = getSrcFilePath(chunkName, currentLang)
+            languages.filter(lang => lang !== defaultLang).forEach(currentLang => {
+                const filePath = getSrcFilePath(chunkName, currentLang);
                 if (!fs.existsSync(filePath)) {
-                    const body = data;
-                    fs.open(filePath, 'w', 666, function( err, id ) {
-                        if (err) throw err;
+                    fs.open(filePath, 'w', 666, (openFileErr, id) => {
+                        if (openFileErr) throw openFileErr;
 
-                        fs.write( id, body + "\r\n", null, 'utf8', function(){
-                            fs.close(id, function(){
+                        fs.write(id, defaultLangData + NEW_LINE, null, 'utf8', () => {
+                            fs.close(id, () => {
                                 console.log('file is updated');
                             });
                         });
                     });
-                } else {
-                    fs.readFile(filePath, (err, data) => {
+                }
+                else {
+                    fs.readFile(filePath, (err, cuurLangFiledata) => {
                         if (err) throw err;
 
-                        const langData = JSON.parse(data);
+                        const langData = JSON.parse(cuurLangFiledata);
                         const absentKeys = mainLangKeys.filter(k => !(k in langData));
                         if (absentKeys.length) {
                             const absentData = absentKeys.reduce((acc, k) => {
@@ -66,70 +59,80 @@ const regenerateSrc = () => {
                             }, {});
                             const newLangData = {
                                 ...langData,
-                                ...absentData
+                                ...absentData,
                             };
-                            fs.open(filePath, 'w', 666, function( err, id ) {
-                                if (err) throw err;
+                            fs.open(filePath, 'w', 666, (currLangOpenErr, id) => {
+                                if (currLangOpenErr) throw currLangOpenErr;
 
-                                fs.write( id, JSON.stringify(newLangData, null, 4), null, 'utf8', function(){
-                                    fs.close(id, function(){
+                                fs.write(id, JSON.stringify(newLangData, null, 4), null, 'utf8', () => {
+                                    fs.close(id, () => {
                                         console.log(`${filePath} file is updated`);
                                     });
                                 });
                             });
                         }
-                    })
+                    });
                 }
-            })
-        })
-    }
-}
+            });
+        });
+    };
+
+    fs.readdir(SRC_FOLDER, (err, fileNames) => {
+        fileNames.map(fn => fn.split('.')[0])
+            .filter((v, i, a) => a.indexOf(v) === i)
+            .forEach(chunkName => processChunk(chunkName));
+    });
+};
 
 const regenerateDist = () => {
-    fs.readdir(SRC_FOLDER, (err, data) => {
-        if (err) throw err;
-        data.forEach(f => fs.readFile(`${SRC_FOLDER}${f}`, (err, content) => {
+    const generateNamespaceAssign = () => `ep.resources = ep.resources || {};${NEW_LINE}`;
+    const generateObject = (content, name) => `ep.resources.${name} = {${NEW_LINE}${content}${NEW_LINE}};`;
+    const generateBody = (name, strings) => [
+        generateNamespaceAssign(),
+        NEW_LINE,
+        generateObject(strings.join(`${NEW_LINE}`), name),
+    ].join('');
+
+    const process = (filename, body) => {
+        const filePath = `${DIST_FOLDER}${filename}${RESX_PREFIX}.js`;
+        fs.open(filePath, 'w', 666, (err, id) => {
             if (err) throw err;
-            
-            const name = f.split('.').slice(0, -1).join('.');
-            const filename = f.split(".")[0];
-            regenerateResx(filename, content, name);
-        }))
-    });
-    
+            fs.write(id, body + NEW_LINE, null, 'utf8', () => {
+                fs.close(id, () => {
+                    console.log('file is regenerated');
+                });
+            });
+        });
+    };
+
+    const generateStringsFromJson = json => {
+        const keys = Object.keys(json).sort((a, b) => a > b);
+        return keys.map(k => `${TAB}${k}: '${json[k]}',`);
+    };
+
     const regenerateResx = (name, data, filename) => {
         const content = JSON.parse(data);
         const strings = generateStringsFromJson(content);
         const body = generateBody(name, strings);
         process(filename, body);
-    }
-    
-    const generateNamespaceAssign = () => `ep.resources = ep.resources || {};${LINE_END}`;
-    const generateObject = (content, name) => `ep.resources.${name} = {${LINE_END}${content}${LINE_END}};`;
-    const generateBody = (name, strings) => [generateNamespaceAssign(), LINE_END, generateObject(strings.join(`${LINE_END}`), name)].join("");
-    
-    const generateStringsFromJson = (json) => {
-        const keys = Object.keys(json).sort((a,b) => a > b);
-        return keys.map(k => `${TAB}${k}: "${json[k]}",`);
-    }
-    
-    function process (filename, body) {     
-        fs.open(`${DIST_FOLDER}${filename}.js`, 'w', 666, function( err, id ) {
-            if (err) throw err;
-            fs.write( id, body + "\r\n", null, 'utf8', function(){
-                fs.close(id, function(){
-                    console.log('file is updated');
-                });
-            });
-        });
-    }
+    };
+
+    fs.readdir(SRC_FOLDER, (readDirErr, data) => {
+        if (readDirErr) throw readDirErr;
+        data.forEach(f => fs.readFile(`${SRC_FOLDER}${f}`, (readFileErr, content) => {
+            if (readFileErr) throw readFileErr;
+            const name = f.split('.').slice(0, -1).join('.');
+            const filename = f.split('.')[0];
+            regenerateResx(filename, content, name);
+        }));
+    });
 };
 
-const ask = () => {
+const beginInteraction = () => {
     const actions = {
-        create: "create",
-        add: "add",
-    }
+        create: 'create',
+        add: 'add',
+    };
 
     const actonsList = [
         { name: 'Create new resx File', value: actions.create },
@@ -137,56 +140,45 @@ const ask = () => {
     ];
 
     const startupQuestions = [
-        { type: 'list', name: 'action', message: 'What would you like to do', choices: actonsList },
+        {
+            type: 'list', name: 'action', message: 'What would you like to do', choices: actonsList,
+        },
         {
             type: 'input',
             name: 'resxName',
-            message: `What's the name of resx file? `,
-            when: a => a.action == actions.add,
+            message: 'What\'s the name of resx file? ',
+            when: a => a.action === actions.add,
             validate: resxName => {
-                if (!fs.existsSync(getSrcFilePath(resxName, defaultLang))){
-                    return `Resource doesn't exists`;
-                } else {
-                    return true;
-                }
+                const exists = fs.existsSync(getSrcFilePath(resxName, defaultLang));
+                return exists ? true : 'Resource doesn\'t exists';
             },
-        }
-    ]
+        },
+    ];
 
-    inquirer
-        .prompt(startupQuestions)
-        .then(a => {
-            if(a.action == actions.add) {
-                addScenario(a.resxName);
-            }
-        });
+    const createDefaultLangs = [defaultLang, 'ru'];
+    const langList = languages.map(l => ({ name: l }));
 
-    const createDefaultLangs = [defaultLang, "ru"];
-    const langList = languages.map(l => ({name: l}));
-
-    const doLangKeyValQuestions = (lang) => ({
+    const doLangKeyValQuestions = lang => ({
         type: 'input',
         name: 'val',
         message: `${lang} value for this key?`,
-        validate: a => {
-            return !!a ? true : `Can't add empty value`;
-        },
+        validate: a => (a ? true : 'Can\'t add empty value'),
     });
 
-    const doAddScenarioQuestions = (resxName) => [
+    const doAddScenarioQuestions = resxName => [
         {
             type: 'input',
             name: 'keyName',
-            message: `Key name? `,
+            message: 'Key name? ',
             validate: a => {
                 const fileContent = JSON.parse(fs.readFileSync(getSrcFilePath(resxName, defaultLang), 'utf8'));
-                return a in fileContent ? `This key is already exists` : true;
+                return a in fileContent ? 'This key is already exists' : true;
             },
         },
         {
             type: 'checkbox',
             name: 'keyLangs',
-            message: 'Which lang resources would you like to add keys to',
+            message: 'Which lang resources would you like to add keys to? ',
             choices: langList,
             default: createDefaultLangs,
         },
@@ -195,19 +187,18 @@ const ask = () => {
     const doAdd = (resxName, keyName, keyLangs, langValPairs) => {
         keyLangs.forEach(l => {
             const filePath = getSrcFilePath(resxName, l);
-            fs.readFile(filePath, (err, data) => {
-                if (err) throw err;
-                const content = JSON.parse(data);
+            fs.readFile(filePath, (readLangErr, langData) => {
+                if (readLangErr) throw readLangErr;
+                const content = JSON.parse(langData);
                 const langVal = langValPairs[l];
                 const newLangData = {
                     ...content,
                     [keyName]: langVal,
-                }
-                console.log(newLangData);
-                fs.open(filePath, 'w', 666, function( err, id ) {
-                    if (err) throw err;
-                    fs.write( id, JSON.stringify(newLangData, null, 4), null, 'utf8', function(){
-                        fs.close(id, function(){
+                };
+                fs.open(filePath, 'w', 666, (langOpenErr, id) => {
+                    if (langOpenErr) throw langOpenErr;
+                    fs.write(id, JSON.stringify(newLangData, null, 4), null, 'utf8', () => {
+                        fs.close(id, () => {
                             console.log(`${filePath} file is updated`);
                         });
                     });
@@ -218,44 +209,57 @@ const ask = () => {
         // TODO: handle DONE state somehow and call ^;
     };
 
-    const addScenario = (resxName) => {
-        const askForKey = () => {
-            inquirer.prompt(doAddScenarioQuestions(resxName))
-            .then(a => {
-                askForValues(a.keyName, a.keyLangs);
-            });
-        };
+    const addScenario = resxName => {
         const askForValues = (keyName, keyLangs) => {
-            let langValPairs = [];
+            const langValPairs = [];
             let iteration = 0;
-            const askForValue = (v = {}) => {
-                const values = v;
+            const askForValue = () => {
                 const currLang = keyLangs[iteration];
                 if (langValPairs.length < keyLangs.length) {
                     const question = doLangKeyValQuestions(currLang);
                     inquirer
                         .prompt(question)
                         .then(a => {
-                            langValPairs.push({[currLang]: a.val});
-                            ++iteration;
+                            langValPairs.push({ [currLang]: a.val });
+                            iteration += 1;
                             askForValue();
-                        }); 
-                } else {
+                        });
+                }
+                else {
                     const langData = langValPairs.reduce((acc, val) => {
                         const key = Object.keys(val)[0];
                         acc[key] = val[key];
                         return acc;
-                    }, {})
+                    }, {});
                     doAdd(resxName, keyName, keyLangs, langData);
                 }
-            }
+            };
             askForValue();
         };
+
+        const askForKey = () => {
+            inquirer
+                .prompt(doAddScenarioQuestions(resxName))
+                .then(a => {
+                    askForValues(a.keyName, a.keyLangs);
+                });
+        };
+        
         askForKey();
     };
-}
- 
+
+    inquirer
+        .prompt(startupQuestions)
+        .then(a => {
+            if (a.action === actions.add) {
+                addScenario(a.resxName);
+            }
+        });
+};
+
 // TODO: complete 'add new resx' functionality + possibility to add keys on create
 // TODO: remove key in src file if it does not exists in default lang file
 // TODO: not sure: generate absent keys only to dist files instead of generating it into src
-// TODO: add posibility to add keys into file recoursively (add key? => done => add key? => done => ...)
+// TODO: + posibility to add keys into file recoursively (add key? => done => add key? => ...)
+// TODO: split all this hell into 3 modules
+// TODO: add d.ts generation
