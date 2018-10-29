@@ -146,10 +146,10 @@ const regenerateSrc = (interactive = true) => {
                                 const langDataKeys = Object.keys(langData);
                                 const absentKeys = mainLangKeys.filter(k => !(k in langData));
                                 const extraKeys = langDataKeys.filter(k => !(k in mainLangData));
-                                if (extraKeys.length) {
+                                const hasExtraKeys = !!extraKeys.length;
+                                if (hasExtraKeys) {
                                     extraKeys.forEach(k => {
                                         delete langData[k]
-                                        console.log(`extra key '${k}' has been deleted`);
                                     })
                                 }
                                 if (absentKeys.length || extraKeys.length) {
@@ -167,7 +167,18 @@ const regenerateSrc = (interactive = true) => {
                                                 .then(() => {
                                                     return closeAsync(id)
                                                         .then(() => {
-                                                            console.log(`${filePath} - file is updated`);
+                                                            if (hasExtraKeys) {
+                                                                console.log('----------------------');
+                                                                console.log(`${filePath} - found extra keys`);
+                                                                extraKeys.forEach(k => console.log(`'${k}' has been deleted`));
+                                                                console.log(`${filePath} - file is updated`);
+                                                                console.log('----------------------');
+                                                                
+                                                            }
+                                                            else {
+                                                                console.log(`${filePath} - file is updated`);
+                                                            }
+                        
                                                         })
                                                 })
                                         })
@@ -405,7 +416,6 @@ regenerateSrc(false)
 // TODO: + remove key functionality
 // TODO: add d.ts generation
 // TODO: ???rework to classes
-// TODO
 //                          Code refactoring:
 // TODO: all openAsync(filePath, 'w', 666) move to helper function
 // TODO: split all this hell into 3 modules
