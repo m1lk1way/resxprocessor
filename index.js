@@ -2,7 +2,7 @@ const fs = require('fs');
 const { promisify } = require('util');
 const inquirer = require('inquirer');
 // const program = require('commander');
-// const colors = require('colors');
+const colors = require('colors');
 
 const readFileAsync = promisify(fs.readFile);
 const openAsync = promisify(fs.open);
@@ -41,11 +41,11 @@ const yesNoList = [
 const defaultLang = languages[0];
 const getSrcFilePath = (chunkName, lang) => `${SRC_FOLDER}${chunkName}.${lang}.json`;
 
-const generateLogSection = (sectionText) => {
+const generateLogSection = sectionText => {
     console.log('-----------------------');
     console.log(`${sectionText}`);
     console.log('-----------------------');
-}
+};
 
 const generateNamespaceAssign = () => `ep.resources = ep.resources || {};${NEW_LINE}`;
 const generateObject = (content, name) => `ep.resources.${name} = {${NEW_LINE}${content}${NEW_LINE}};`;
@@ -60,14 +60,14 @@ const regenerateDist = (interactive = true) => {
     const process = (filename, body, lang) => {
         const filePath = `${DIST_FOLDER}${filename}${RESX_PREFIX}.${lang}.js`;
         return openAsync(filePath, 'w', 666)
-            .then((id) => {
-                return writeAsync(id, body + NEW_LINE, null, 'utf8')
-                    .then(() => {
-                        return closeAsync(id)
+            .then(id => (
+                writeAsync(id, body + NEW_LINE, null, 'utf8')
+                    .then(() => (
+                        closeAsync(id)
                             .then(() => console.log(`${filePath} file is regenerated`))
-                    })
-            })
-            .catch((distOpenErr) => console.log('ERROR:', distOpenErr))
+                    ))
+            ))
+            .catch(distOpenErr => console.log('ERROR:', distOpenErr));
     };
 
     const generateStringsFromJson = json => {
@@ -86,33 +86,33 @@ const regenerateDist = (interactive = true) => {
         const operations = data.map(srcFileName => {
             const srcFilePath = `${SRC_FOLDER}${srcFileName}`;
             return readFileAsync(srcFilePath, { encoding: 'utf8' })
-                .then((srcFileData) => {
+                .then(srcFileData => {
                     const filenameData = srcFileName.split('.');
                     const [resxName, lang] = filenameData;
                     return regenerateResx(resxName, srcFileData, lang);
                 })
-                .catch((srcFileReadError) => console.log('ERROR:', srcFileReadError));
+                .catch(srcFileReadError => console.log('ERROR:', srcFileReadError));
         });
         Promise.all(operations)
             .then(() => {
                 if (interactive) {
                     inquirer
-                    .prompt({
-                        type: 'list',
-                        name: 'newKey',
-                        message: 'Would you like to do something else?',
-                        choices: yesNoList,
-                    })
-                    .then(a => {
-                        if (a.newKey === yesNo.yes) {
-                            beginInteraction();
-                        }
-                    });
-                } 
-                else {
-                    console.log("ALL IS OK. Enjoy ;)")
+                        .prompt({
+                            type: 'list',
+                            name: 'newKey',
+                            message: 'Would you like to do something else?',
+                            choices: yesNoList,
+                        })
+                        .then(a => {
+                            if (a.newKey === yesNo.yes) {
+                                beginInteraction();
+                            }
+                        });
                 }
-            })
+                else {
+                    console.log(colors.green('EVERYTHING IS OK. Enjoy ^_^'));
+                }
+            });
     });
 };
 
@@ -124,22 +124,20 @@ const regenerateSrc = (interactive = true) => {
             .then(defaultLangData => {
                 const mainLangData = JSON.parse(defaultLangData);
                 const mainLangKeys = Object.keys(mainLangData);
-                const operations = languages.filter(lang => lang !== defaultLang).map(currentLang => {
-                    const filePath = getSrcFilePath(chunkName, currentLang);
-                    if (!fs.existsSync(filePath)) {
-                        return openAsync(filePath, 'w', 666)
-                            .then(id => {
-                                return writeAsync(id, defaultLangData + NEW_LINE, null, 'utf8')
-                                    .then(() => {
-                                        return closeAsync(id)
-                                            .then(() => {
-                                                console.log(`${filePath} - file is updated`);
-                                            })
-                                    })
-                            })
-                            .catch(openFileErr => console.log('ERROR:', openFileErr));
-                    }
-                    else {
+                const operations = languages.filter(lang => lang !== defaultLang)
+                    .map(currentLang => {
+                        const filePath = getSrcFilePath(chunkName, currentLang);
+                        if (!fs.existsSync(filePath)) {
+                            return openAsync(filePath, 'w', 666)
+                                .then(id => (
+                                    writeAsync(id, defaultLangData + NEW_LINE, null, 'utf8')
+                                        .then(() => (
+                                            closeAsync(id)
+                                                .then(() => console.log(colors.bgYellow(`${filePath} - file is updated`)))
+                                        ))
+                                ))
+                                .catch(openFileErr => console.log('ERROR:', openFileErr));
+                        }
                         return readFileAsync(filePath, { encoding: 'utf8' })
                             .then(currLangFiledata => {
                                 const langData = JSON.parse(currLangFiledata);
@@ -147,12 +145,12 @@ const regenerateSrc = (interactive = true) => {
                                 const absentKeys = mainLangKeys.filter(k => !(k in langData));
                                 const extraKeys = langDataKeys.filter(k => !(k in mainLangData));
                                 const hasExtraKeys = !!extraKeys.length;
-                                if (hasExtraKeys) {
-                                    extraKeys.forEach(k => {
-                                        delete langData[k]
-                                    })
-                                }
-                                if (absentKeys.length || extraKeys.length) {
+                                if (absentKeys.length || hasExtraKeys) {
+                                    if (hasExtraKeys) {
+                                        extraKeys.forEach(k => {
+                                            delete langData[k];
+                                        });
+                                    }
                                     const absentData = absentKeys.reduce((acc, k) => {
                                         acc[k] = mainLangData[k];
                                         return acc;
@@ -162,51 +160,46 @@ const regenerateSrc = (interactive = true) => {
                                         ...absentData,
                                     };
                                     return openAsync(filePath, 'w', 666)
-                                        .then(id => {
-                                            return writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
-                                                .then(() => {
-                                                    return closeAsync(id)
+                                        .then(id => (
+                                            writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
+                                                .then(() => (
+                                                    closeAsync(id)
                                                         .then(() => {
                                                             if (hasExtraKeys) {
                                                                 console.log('----------------------');
                                                                 console.log(`${filePath} - found extra keys`);
                                                                 extraKeys.forEach(k => console.log(`'${k}' has been deleted`));
-                                                                console.log(`${filePath} - file is updated`);
+                                                                console.log(colors.bgYellow(`${filePath} - file is updated`));
                                                                 console.log('----------------------');
-                                                                
                                                             }
                                                             else {
-                                                                console.log(`${filePath} - file is updated`);
+                                                                console.log(colors.bgYellow(`${filePath} - file is updated`));
                                                             }
-                        
                                                         })
-                                                })
-                                        })
-                                        .catch(currLangOpenErr => console.log('ERROR:', curLangFileReadErr))
+                                                ))
+                                        ))
+                                        .catch(currLangOpenErr => console.log('ERROR:', currLangOpenErr));
                                 }
-                                else {
-                                    console.log(`${filePath} - file is up to date`)
-                                }
+                                return console.log(`${filePath} - file is up to date`);
                             })
                             .catch(curLangFileReadErr => {
-                                console.log('ERROR:', curLangFileReadErr)
-                            })
-                    }
-                });
-                return Promise.all(operations).then(() => {})
+                                console.log('ERROR:', curLangFileReadErr);
+                            });
+                    });
+                return Promise.all(operations).then(() => {});
             })
-            .catch(readDefaultLangErr => console.log('ERROR:', readDefaultLangErr))
+            .catch(readDefaultLangErr => console.log('ERROR:', readDefaultLangErr));
     };
 
     fs.readdir(SRC_FOLDER, (err, fileNames) => {
         const chunkNames = fileNames.map(fn => fn.split('.')[0])
-                                    .filter((v, i, a) => a.indexOf(v) === i);
+            .filter((v, i, a) => a.indexOf(v) === i);
 
         const operations = chunkNames.map(chunkName => processChunk(chunkName));
         Promise.all(operations)
-        .then(() => {
-            regenerateDist(false);
-        })
+            .then(() => {
+                regenerateDist(interactive);
+            });
     });
 };
 
@@ -214,30 +207,31 @@ const generateEmptyChunk = (chunkName, callback) => {
     const operations = languages.map(l => {
         const filePath = getSrcFilePath(chunkName, l);
         return openAsync(filePath, 'w', 666)
-                        .then(id => {
-                            return writeAsync(id, JSON.stringify({}), null, 'utf8')
-                                .then(() => {
-                                    return closeAsync(id)
-                                        .then(() => console.log(`${filePath} empty resource file was created`))
-                                })
-                        })
-                        .catch(langOpenErr => console.log('ERROR:', langOpenErr));
-    })
+            .then(id => (
+                writeAsync(id, JSON.stringify({}), null, 'utf8')
+                    .then(() => (
+                        closeAsync(id)
+                            .then(() => console.log(`${filePath} empty resource file was created`))
+                    ))
+            ))
+            .catch(langOpenErr => console.log('ERROR:', langOpenErr));
+    });
+
     Promise.all(operations)
         .then(() => {
             callback(chunkName);
-        })
-}
+        });
+};
 
 const beginInteraction = () => {
     const actions = {
         create: 'create',
         add: 'add',
-        regenerateAll: "regenerateAll",
+        regenerateAll: 'regenerateAll',
     };
 
     const actonsList = [
-        { name: 'Do everything GOOD', value: actions.regenerateAll},
+        { name: 'Do everything GOOD', value: actions.regenerateAll },
         { name: 'Create new resx File', value: actions.create },
         { name: 'Add keys to existing one', value: actions.add },
     ];
@@ -265,7 +259,7 @@ const beginInteraction = () => {
                 const exists = fs.existsSync(getSrcFilePath(resxName, defaultLang));
                 return exists ? 'Resource file already exists' : true;
             },
-        }
+        },
     ];
 
     const createDefaultLangs = [defaultLang, 'ru'];
@@ -309,13 +303,13 @@ const beginInteraction = () => {
                         [keyName]: langVal,
                     };
                     return openAsync(filePath, 'w', 666)
-                        .then(id => {
-                            return writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
-                                .then(() => {
-                                    return closeAsync(id)
-                                        .then(() => console.log(`${filePath} file is updated`))
-                                })
-                        })
+                        .then(id => (
+                            writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
+                                .then(() => (
+                                    closeAsync(id)
+                                        .then(() => console.log(colors.bgYellow(`${filePath} file is updated`)))
+                                ))
+                        ))
                         .catch(langOpenErr => console.log('ERROR:', langOpenErr));
                 })
                 .catch(readLangErr => console.log('ERROR:', readLangErr));
@@ -377,8 +371,8 @@ const beginInteraction = () => {
         askForKey();
     };
 
-    createScenario = (resxName) => {
-        const callback = (resxName) => {
+    const createScenario = resxName => {
+        const callback = name => {
             inquirer
                 .prompt({
                     type: 'list',
@@ -387,13 +381,13 @@ const beginInteraction = () => {
                     choices: yesNoList,
                 })
                 .then(a => {
-                    if(a.addKey === yesNo.yes) {
-                        addScenario(resxName)
+                    if (a.addKey === yesNo.yes) {
+                        addScenario(name);
                     }
                 });
-        }
+        };
         generateEmptyChunk(resxName, callback);
-    }
+    };
 
     inquirer
         .prompt(startupQuestions)
@@ -402,7 +396,7 @@ const beginInteraction = () => {
                 addScenario(a.resxName);
             }
             if (a.action === actions.create) {
-                createScenario(a.resxName)
+                createScenario(a.resxName);
             }
             if (a.action === actions.regenerateAll) {
                 regenerateSrc(false);
@@ -410,8 +404,8 @@ const beginInteraction = () => {
         });
 };
 
-// beginInteraction();
-regenerateSrc(false)
+beginInteraction();
+// regenerateSrc(false);
 //                          Functionality:
 // TODO: + remove key functionality
 // TODO: add d.ts generation
