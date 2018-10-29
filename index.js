@@ -4,6 +4,11 @@ const inquirer = require('inquirer');
 // const program = require('commander');
 // const colors = require('colors');
 
+const readFileAsync = promisify(fs.readFile);
+const openAsync = promisify(fs.open);
+const writeAsync = promisify(fs.write);
+const closeAsync = promisify(fs.close);
+
 const NEW_LINE = '\r\n';
 const TABSIZE = 4;
 const TAB = new Array(TABSIZE + 1).join(' ');
@@ -23,93 +28,46 @@ const languages = [
     'tr',
 ];
 
-const readFileAsync = promisify(fs.readFile);
-const openAsync = promisify(fs.open);
-const writeAsync = promisify(fs.write);
-const closeAsync = promisify(fs.close);
+const yesNo = {
+    yes: 'Yes',
+    no: 'No',
+};
+
+const yesNoList = [
+    { name: yesNo.yes },
+    { name: yesNo.no },
+];
 
 const defaultLang = languages[0];
 const getSrcFilePath = (chunkName, lang) => `${SRC_FOLDER}${chunkName}.${lang}.json`;
 
-const regenerateSrc = () => {
-    console.log('regenerating json files');
-    const processChunk = chunkName => {
-        const defaultLangPath = getSrcFilePath(chunkName, defaultLang);
-        fs.readFile(defaultLangPath, (readFileErr, defaultLangData) => {
-            if (readFileErr) throw readFileErr;
+const generateLogSection = (sectionText) => {
+    console.log('-----------------------');
+    console.log(`${sectionText}`);
+    console.log('-----------------------');
+}
 
-            const mainLangData = JSON.parse(defaultLangData);
-            const mainLangKeys = Object.keys(mainLangData);
-            languages.filter(lang => lang !== defaultLang).forEach(currentLang => {
-                const filePath = getSrcFilePath(chunkName, currentLang);
-                if (!fs.existsSync(filePath)) {
-                    fs.open(filePath, 'w', 666, (openFileErr, id) => {
-                        if (openFileErr) throw openFileErr;
+const generateNamespaceAssign = () => `ep.resources = ep.resources || {};${NEW_LINE}`;
+const generateObject = (content, name) => `ep.resources.${name} = {${NEW_LINE}${content}${NEW_LINE}};`;
+const generateBody = (name, strings) => [
+    generateNamespaceAssign(),
+    NEW_LINE,
+    generateObject(strings.join(`${NEW_LINE}`), name),
+].join('');
 
-                        fs.write(id, defaultLangData + NEW_LINE, null, 'utf8', () => {
-                            fs.close(id, () => {
-                                console.log('file is updated');
-                            });
-                        });
-                    });
-                }
-                else {
-                    fs.readFile(filePath, (err, cuurLangFiledata) => {
-                        if (err) throw err;
-
-                        const langData = JSON.parse(cuurLangFiledata);
-                        const absentKeys = mainLangKeys.filter(k => !(k in langData));
-                        if (absentKeys.length) {
-                            const absentData = absentKeys.reduce((acc, k) => {
-                                acc[k] = mainLangData[k];
-                                return acc;
-                            }, {});
-                            const newLangData = {
-                                ...langData,
-                                ...absentData,
-                            };
-                            fs.open(filePath, 'w', 666, (currLangOpenErr, id) => {
-                                if (currLangOpenErr) throw currLangOpenErr;
-
-                                fs.write(id, JSON.stringify(newLangData, null, 4), null, 'utf8', () => {
-                                    fs.close(id, () => {
-                                        console.log(`${filePath} file is updated`);
-                                    });
-                                });
-                            });
-                        }
-                    });
-                }
-            });
-        });
-    };
-
-    fs.readdir(SRC_FOLDER, (err, fileNames) => {
-        fileNames.map(fn => fn.split('.')[0])
-            .filter((v, i, a) => a.indexOf(v) === i)
-            .forEach(chunkName => processChunk(chunkName));
-    });
-};
-
-const regenerateDist = () => {
-    const generateNamespaceAssign = () => `ep.resources = ep.resources || {};${NEW_LINE}`;
-    const generateObject = (content, name) => `ep.resources.${name} = {${NEW_LINE}${content}${NEW_LINE}};`;
-    const generateBody = (name, strings) => [
-        generateNamespaceAssign(),
-        NEW_LINE,
-        generateObject(strings.join(`${NEW_LINE}`), name),
-    ].join('');
-
-    const process = (filename, body) => {
-        const filePath = `${DIST_FOLDER}${filename}${RESX_PREFIX}.js`;
-        fs.open(filePath, 'w', 666, (err, id) => {
-            if (err) throw err;
-            fs.write(id, body + NEW_LINE, null, 'utf8', () => {
-                fs.close(id, () => {
-                    console.log('file is regenerated');
-                });
-            });
-        });
+const regenerateDist = (interactive = true) => {
+    generateLogSection('regenerating dist files');
+    const process = (filename, body, lang) => {
+        const filePath = `${DIST_FOLDER}${filename}${RESX_PREFIX}.${lang}.js`;
+        return openAsync(filePath, 'w', 666)
+            .then((id) => {
+                return writeAsync(id, body + NEW_LINE, null, 'utf8')
+                    .then(() => {
+                        return closeAsync(id)
+                            .then(() => console.log(`${filePath} file is regenerated`))
+                    })
+            })
+            .catch((distOpenErr) => console.log('ERROR:', distOpenErr))
     };
 
     const generateStringsFromJson = json => {
@@ -117,31 +75,158 @@ const regenerateDist = () => {
         return keys.map(k => `${TAB}${k}: '${json[k]}',`);
     };
 
-    const regenerateResx = (name, data, filename) => {
+    const regenerateResx = (resxName, data, lang) => {
         const content = JSON.parse(data);
         const strings = generateStringsFromJson(content);
-        const body = generateBody(name, strings);
-        process(filename, body);
+        const body = generateBody(resxName, strings);
+        return process(resxName, body, lang);
     };
-
     fs.readdir(SRC_FOLDER, (readDirErr, data) => {
         if (readDirErr) throw readDirErr;
-        data.forEach(f => fs.readFile(`${SRC_FOLDER}${f}`, (readFileErr, content) => {
-            if (readFileErr) throw readFileErr;
-            const name = f.split('.').slice(0, -1).join('.');
-            const filename = f.split('.')[0];
-            regenerateResx(filename, content, name);
-        }));
+        const operations = data.map(srcFileName => {
+            const srcFilePath = `${SRC_FOLDER}${srcFileName}`;
+            return readFileAsync(srcFilePath, { encoding: 'utf8' })
+                .then((srcFileData) => {
+                    const filenameData = srcFileName.split('.');
+                    const [resxName, lang] = filenameData;
+                    return regenerateResx(resxName, srcFileData, lang);
+                })
+                .catch((srcFileReadError) => console.log('ERROR:', srcFileReadError));
+        });
+        Promise.all(operations)
+            .then(() => {
+                if (interactive) {
+                    inquirer
+                    .prompt({
+                        type: 'list',
+                        name: 'newKey',
+                        message: 'Would you like to do something else?',
+                        choices: yesNoList,
+                    })
+                    .then(a => {
+                        if (a.newKey === yesNo.yes) {
+                            beginInteraction();
+                        }
+                    });
+                } 
+                else {
+                    console.log("ALL IS OK. Enjoy ;)")
+                }
+            })
     });
 };
+
+const regenerateSrc = (interactive = true) => {
+    generateLogSection('regenerating src files');
+    const processChunk = chunkName => {
+        const defaultLangPath = getSrcFilePath(chunkName, defaultLang);
+        return readFileAsync(defaultLangPath, { encoding: 'utf8' })
+            .then(defaultLangData => {
+                const mainLangData = JSON.parse(defaultLangData);
+                const mainLangKeys = Object.keys(mainLangData);
+                const operations = languages.filter(lang => lang !== defaultLang).map(currentLang => {
+                    const filePath = getSrcFilePath(chunkName, currentLang);
+                    if (!fs.existsSync(filePath)) {
+                        return openAsync(filePath, 'w', 666)
+                            .then(id => {
+                                return writeAsync(id, defaultLangData + NEW_LINE, null, 'utf8')
+                                    .then(() => {
+                                        return closeAsync(id)
+                                            .then(() => {
+                                                console.log(`${filePath} - file is updated`);
+                                            })
+                                    })
+                            })
+                            .catch(openFileErr => console.log('ERROR:', openFileErr));
+                    }
+                    else {
+                        return readFileAsync(filePath, { encoding: 'utf8' })
+                            .then(currLangFiledata => {
+                                const langData = JSON.parse(currLangFiledata);
+                                const langDataKeys = Object.keys(langData);
+                                const absentKeys = mainLangKeys.filter(k => !(k in langData));
+                                const extraKeys = langDataKeys.filter(k => !(k in mainLangData));
+                                if (extraKeys.length) {
+                                    extraKeys.forEach(k => {
+                                        delete langData[k]
+                                        console.log(`extra key '${k}' has been deleted`);
+                                    })
+                                }
+                                if (absentKeys.length || extraKeys.length) {
+                                    const absentData = absentKeys.reduce((acc, k) => {
+                                        acc[k] = mainLangData[k];
+                                        return acc;
+                                    }, {});
+                                    const newLangData = {
+                                        ...langData,
+                                        ...absentData,
+                                    };
+                                    return openAsync(filePath, 'w', 666)
+                                        .then(id => {
+                                            return writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
+                                                .then(() => {
+                                                    return closeAsync(id)
+                                                        .then(() => {
+                                                            console.log(`${filePath} - file is updated`);
+                                                        })
+                                                })
+                                        })
+                                        .catch(currLangOpenErr => console.log('ERROR:', curLangFileReadErr))
+                                }
+                                else {
+                                    console.log(`${filePath} - file is up to date`)
+                                }
+                            })
+                            .catch(curLangFileReadErr => {
+                                console.log('ERROR:', curLangFileReadErr)
+                            })
+                    }
+                });
+                return Promise.all(operations).then(() => {})
+            })
+            .catch(readDefaultLangErr => console.log('ERROR:', readDefaultLangErr))
+    };
+
+    fs.readdir(SRC_FOLDER, (err, fileNames) => {
+        const chunkNames = fileNames.map(fn => fn.split('.')[0])
+                                    .filter((v, i, a) => a.indexOf(v) === i);
+
+        const operations = chunkNames.map(chunkName => processChunk(chunkName));
+        Promise.all(operations)
+        .then(() => {
+            regenerateDist(false);
+        })
+    });
+};
+
+const generateEmptyChunk = (chunkName, callback) => {
+    const operations = languages.map(l => {
+        const filePath = getSrcFilePath(chunkName, l);
+        return openAsync(filePath, 'w', 666)
+                        .then(id => {
+                            return writeAsync(id, JSON.stringify({}), null, 'utf8')
+                                .then(() => {
+                                    return closeAsync(id)
+                                        .then(() => console.log(`${filePath} empty resource file was created`))
+                                })
+                        })
+                        .catch(langOpenErr => console.log('ERROR:', langOpenErr));
+    })
+    Promise.all(operations)
+        .then(() => {
+            callback(chunkName);
+        })
+}
 
 const beginInteraction = () => {
     const actions = {
         create: 'create',
         add: 'add',
+        regenerateAll: "regenerateAll",
     };
 
     const actonsList = [
+        { name: 'Do everything GOOD', value: actions.regenerateAll},
         { name: 'Create new resx File', value: actions.create },
         { name: 'Add keys to existing one', value: actions.add },
     ];
@@ -160,16 +245,16 @@ const beginInteraction = () => {
                 return exists ? true : 'Resource doesn\'t exists';
             },
         },
-    ];
-
-    const yesNo = {
-        yes: 'Yes',
-        no: 'No',
-    };
-    
-    const yesNoList = [
-        { name: yesNo.yes },
-        { name: yesNo.no },
+        {
+            type: 'input',
+            name: 'resxName',
+            message: 'Give it a name: ',
+            when: a => a.action === actions.create,
+            validate: resxName => {
+                const exists = fs.existsSync(getSrcFilePath(resxName, defaultLang));
+                return exists ? 'Resource file already exists' : true;
+            },
+        }
     ];
 
     const createDefaultLangs = [defaultLang, 'ru'];
@@ -213,13 +298,13 @@ const beginInteraction = () => {
                         [keyName]: langVal,
                     };
                     return openAsync(filePath, 'w', 666)
-                        .then(id => (
-                            writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
-                                .then(() => (
-                                    closeAsync(id)
+                        .then(id => {
+                            return writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
+                                .then(() => {
+                                    return closeAsync(id)
                                         .then(() => console.log(`${filePath} file is updated`))
-                                ))
-                        ))
+                                })
+                        })
                         .catch(langOpenErr => console.log('ERROR:', langOpenErr));
                 })
                 .catch(readLangErr => console.log('ERROR:', readLangErr));
@@ -281,26 +366,51 @@ const beginInteraction = () => {
         askForKey();
     };
 
+    createScenario = (resxName) => {
+        const callback = (resxName) => {
+            inquirer
+                .prompt({
+                    type: 'list',
+                    name: 'addKey',
+                    message: 'Would you like to add some keys to it??',
+                    choices: yesNoList,
+                })
+                .then(a => {
+                    if(a.addKey === yesNo.yes) {
+                        addScenario(resxName)
+                    }
+                });
+        }
+        generateEmptyChunk(resxName, callback);
+    }
+
     inquirer
         .prompt(startupQuestions)
         .then(a => {
             if (a.action === actions.add) {
                 addScenario(a.resxName);
             }
+            if (a.action === actions.create) {
+                createScenario(a.resxName)
+            }
+            if (a.action === actions.regenerateAll) {
+                regenerateSrc(false);
+            }
         });
 };
 
-beginInteraction();
-
+// beginInteraction();
+regenerateSrc(false)
 //                          Functionality:
-// TODO: + 'create new resx' functionality + possibility to add keys on create
 // TODO: + remove key functionality
 // TODO: add d.ts generation
 // TODO: ???rework to classes
-
+// TODO
 //                          Code refactoring:
-// TODO: rework regenerateSrc function and regenerateDist into Pomise-based *To handle done state
+// TODO: all openAsync(filePath, 'w', 666) move to helper function
 // TODO: split all this hell into 3 modules
+// TODO: move all trash (leke const variables, paths) to cfg and add ability to pass other config
+// TODO: !!!move this package as global package
 
 //                          Doubtful functionality:
 // TODO: ???generate absent keys only to dist files instead of generating it into src
