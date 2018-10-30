@@ -14,6 +14,7 @@
         "indent": ["error", 4],
         "linebreak-style": 0,
         "no-console": 0,
-        "no-use-before-define": ["error", { "variables": false }]
+        "no-use-before-define": ["error", { "variables": false }],
+        "max-len": ["error", { "code": 140 }]
     }
 }
