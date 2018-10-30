@@ -1,9 +1,0 @@
-{
-    "tabSize" : "4",
-    "srcFolder" : "./resxSrc/",
-    "distFolder" : "./resxDist/",
-    "resxPrefix" : "Resx",
-    "jsNamespace" : "ep.resources",
-    "tsGlobInterface" : "EPResources",
-    "languages" : [ "en", "ru", "de", "fr", "es", "it", "pl", "sk", "tr"]
-}
