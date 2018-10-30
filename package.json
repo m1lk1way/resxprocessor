@@ -1,7 +1,7 @@
 {
-  "name": "jsoncrud",
+  "name": "resxprocessor",
   "version": "1.0.0",
-  "description": "",
+  "description": "fast, powerfull resx -> js + ts language resource generator",
   "bin": {
     "resxprocessor": "./bin/global.js"
   },
@@ -12,7 +12,7 @@
   },
   "preferGlobal": true,
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "colors": "^1.3.2",
     "commander": "^2.19.0",
