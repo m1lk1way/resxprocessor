@@ -10,13 +10,11 @@ const writeAsync = promisify(fs.write);
 const closeAsync = promisify(fs.close);
 const readdirAsync = promisify(fs.readdir);
 
-const NEW_LINE = '\r\n';
-
-
 const initModule = ({
     tabSize, srcFolder, distFolder, resxPrefix, jsNamespace, tsGlobInterface, languages,
 }) => {
-    const TAB = new Array(tabSize + 1).join(' ');
+    const NEW_LINE = '\r\n';
+    const TAB = new Array(parseInt(tabSize, 10) + 1).join(' ');
     const defaultLang = languages[0];
 
     const yesNo = {

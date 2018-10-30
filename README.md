@@ -23,7 +23,7 @@ $ npm install resxprocessor -g
 * Create config file at the very same folder as you going to use this package.
 * Give it a name ``.resxprocessor``
 
-    ### Configuration keys:
+    ```Configuration keys:```
     ```
         "tabSize" - indent config (number of spaces in one tab)
         "srcFolder" - folder to store/process src (.json) files  
@@ -33,7 +33,7 @@ $ npm install resxprocessor -g
         "tsGlobInterface" - name for global Interface (this interface will be extended with generated resx),
         "languages" - list of languages to work with
     ```
-    ### Configuration example:
+    ```Configuration example:```
     ```
     {
         "tabSize" : "4",
@@ -49,7 +49,7 @@ $ npm install resxprocessor -g
    Be sure you run it on the same lavel as your config (.resxprocessor) is luying on.
    * To use it in interactive mode execute:
    ``$ npm resxprocessor``
-    *To use it like "DO EVERYTHING GOOD" execute:
+   * To use it like "DO EVERYTHING GOOD" execute:
     ``$ npm resxprocessor -d``
    
    
