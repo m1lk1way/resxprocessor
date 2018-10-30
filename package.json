@@ -2,11 +2,15 @@
   "name": "jsoncrud",
   "version": "1.0.0",
   "description": "",
+  "bin": {
+    "resxprocessor": "./bin/global.js"
+  },
   "main": "index.js",
   "scripts": {
     "test": "eslint --ignore-path .gitignore .",
     "start": "node index.js"
   },
+  "preferGlobal": true,
   "author": "",
   "license": "ISC",
   "dependencies": {
