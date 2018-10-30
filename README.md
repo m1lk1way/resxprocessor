@@ -1,5 +1,6 @@
 # resxprocessor
 [![Build Status](https://travis-ci.org/m1lk1way/jsonResxGenerator.svg?branch=master)](https://travis-ci.org/m1lk1way/jsonResxGenerator)
+
 This package offers you:
   - Create .json language source files by given languages (through configuration .resxprocessor)
   - Generate .json source files for languages with not specified resources (inherits resources from default language)
@@ -22,7 +23,7 @@ $ npm install resxprocessor -g
 * Create config file at the very same folder as you going to use this package.
 * Give it a name ``.resxprocessor``
 
-    #### Configuration keys:
+    ### Configuration keys:
     ```
         "tabSize" - indent config (number of spaces in one tab)
         "srcFolder" - folder to store/process src (.json) files  
@@ -32,7 +33,7 @@ $ npm install resxprocessor -g
         "tsGlobInterface" - name for global Interface (this interface will be extended with generated resx),
         "languages" - list of languages to work with
     ```
-    #### Configuration example:
+    ### Configuration example:
     ```
     {
         "tabSize" : "4",
