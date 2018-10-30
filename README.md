@@ -36,7 +36,7 @@ $ npm install resxprocessor -g
     ```Configuration example:```
     ```
     {
-        "tabSize" : "4",
+        "tabSize" : 4,
         "srcFolder" : "./resxSrc/",
         "distFolder" : "./resxDist/",
         "resxPrefix" : "Resx",
@@ -48,9 +48,9 @@ $ npm install resxprocessor -g
 ### Usage
    Be sure you run it on the same lavel as your config (.resxprocessor) is luying on.
    * To use it in interactive mode execute:
-   ``$ npm resxprocessor``
+   ``$ resxprocessor``
    * To use it like "DO EVERYTHING GOOD" execute:
-    ``$ npm resxprocessor -d``
+   ``$ resxprocessor -d``
    
    
 License

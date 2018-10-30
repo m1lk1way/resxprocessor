@@ -5,10 +5,8 @@ const program = require('commander');
 const colors = require('colors');
 
 const readFileAsync = promisify(fs.readFile);
-const openAsync = promisify(fs.open);
-const writeAsync = promisify(fs.write);
-const closeAsync = promisify(fs.close);
 const readdirAsync = promisify(fs.readdir);
+const writeFileAsync = promisify(fs.writeFile);
 
 const initModule = ({
     tabSize, srcFolder, distFolder, resxPrefix, jsNamespace, tsGlobInterface, languages,
@@ -16,7 +14,7 @@ const initModule = ({
     const NEW_LINE = '\r\n';
     const TAB = new Array(parseInt(tabSize, 10) + 1).join(' ');
     const defaultLang = languages[0];
-
+    const writeOptions = { flag: 'w', mode: 666, encoding: 'utf8' };
     const yesNo = {
         yes: 'Yes',
         no: 'No',
@@ -105,14 +103,8 @@ const initModule = ({
         genLogSection('regenerating dist files');
         const process = (chunkName, body, lang) => {
             const filePath = getDistFilePath(chunkName, lang);
-            return openAsync(filePath, 'w', 666)
-                .then(id => (
-                    writeAsync(id, body + NEW_LINE, null, 'utf8')
-                        .then(() => (
-                            closeAsync(id)
-                                .then(() => console.log(`${filePath} file is regenerated`))
-                        ))
-                ))
+            return writeFileAsync(filePath, body + NEW_LINE, writeOptions)
+                .then(() => console.log(`${filePath} file is regenerated`))
                 .catch(logErr);
         };
 
@@ -136,19 +128,18 @@ const initModule = ({
                     .then(() => {
                         const genTypesOps = getChunksNames(readdirData).map(chunkName => {
                             const defaultSrcPath = getDefSrcFilePath(chunkName);
+                            let typeBody;
+                            let typePath;
+                            let id;
+
                             return readFileAsync(defaultSrcPath, { encoding: 'utf8' })
                                 .then(defaultSrcData => {
-                                    const typePath = getDefTypesPath(chunkName);
-                                    const typeBody = genTypesBody(chunkName, defaultSrcData);
-                                    return openAsync(typePath, 'w', 666)
-                                        .then(id => (
-                                            writeAsync(id, typeBody + NEW_LINE, null, 'utf8')
-                                                .then(() => (
-                                                    closeAsync(id)
-                                                        .then(() => console.log(`${typePath} - d.ts file is regenerated`))
-                                                ))
-                                        ))
-                                        .catch(logErr);
+                                    typePath = getDefTypesPath(chunkName);
+                                    typeBody = genTypesBody(chunkName, defaultSrcData);
+                                    return writeFileAsync(typePath, typeBody + NEW_LINE, writeOptions);
+                                })
+                                .then(() => {
+                                    console.log(`${typePath} - file is regenerated`);
                                 })
                                 .catch(logErr);
                         });
@@ -179,14 +170,12 @@ const initModule = ({
                         .map(currentLang => {
                             const filePath = getSrcFilePath(chunkName, currentLang);
                             if (!fs.existsSync(filePath)) {
-                                return openAsync(filePath, 'w', 666)
-                                    .then(id => (
-                                        writeAsync(id, defaultLangData + NEW_LINE, null, 'utf8')
-                                            .then(() => (
-                                                closeAsync(id)
-                                                    .then(() => console.log(colors.bgYellow(`${filePath} - file is updated`)))
-                                            ))
-                                    ))
+                                const body = mainLangKeys.reduce((acc, v) => {
+                                    acc[v] = null;
+                                    return acc;
+                                }, {});
+                                return writeFileAsync(filePath, JSON.stringify(body, null, 4), writeOptions)
+                                    .then(() => console.log(colors.bgYellow(`${filePath} - file is updated`)))
                                     .catch(logErr);
                             }
                             return readFileAsync(filePath, { encoding: 'utf8' })
@@ -210,25 +199,19 @@ const initModule = ({
                                             ...langData,
                                             ...absentData,
                                         };
-                                        return openAsync(filePath, 'w', 666)
-                                            .then(id => (
-                                                writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
-                                                    .then(() => (
-                                                        closeAsync(id)
-                                                            .then(() => {
-                                                                if (hasExtraKeys) {
-                                                                    console.log('----------------------');
-                                                                    console.log(`${filePath} - found extra keys`);
-                                                                    extraKeys.forEach(k => console.log(`'${k}' has been deleted`));
-                                                                    console.log(colors.bgYellow(`${filePath} - file is updated`));
-                                                                    console.log('----------------------');
-                                                                }
-                                                                else {
-                                                                    console.log(colors.bgYellow(`${filePath} - file is updated`));
-                                                                }
-                                                            })
-                                                    ))
-                                            ))
+                                        return writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions)
+                                            .then(() => {
+                                                if (hasExtraKeys) {
+                                                    console.log('----------------------');
+                                                    console.log(`${filePath} - found extra keys`);
+                                                    extraKeys.forEach(k => console.log(`'${k}' has been deleted`));
+                                                    console.log(colors.bgYellow(`${filePath} - file is updated`));
+                                                    console.log('----------------------');
+                                                }
+                                                else {
+                                                    console.log(colors.bgYellow(`${filePath} - file is updated`));
+                                                }
+                                            })
                                             .catch(logErr);
                                     }
                                     return console.log(`${filePath} - file is up to date`);
@@ -255,14 +238,8 @@ const initModule = ({
     const generateEmptyChunk = (chunkName, callback) => {
         const operations = languages.map(l => {
             const filePath = getSrcFilePath(chunkName, l);
-            return openAsync(filePath, 'w', 666)
-                .then(id => (
-                    writeAsync(id, JSON.stringify({}), null, 'utf8')
-                        .then(() => (
-                            closeAsync(id)
-                                .then(() => console.log(`${filePath} empty resource file was created`))
-                        ))
-                ))
+            return writeFileAsync(filePath, JSON.stringify({}), writeOptions)
+                .then(() => console.log(`${filePath} empty resource file was created`))
                 .catch(logErr);
         });
 
@@ -341,16 +318,9 @@ const initModule = ({
                             ...content,
                             [keyName]: langVal,
                         };
-                        return openAsync(filePath, 'w', 666)
-                            .then(id => (
-                                writeAsync(id, JSON.stringify(newLangData, null, 4), null, 'utf8')
-                                    .then(() => (
-                                        closeAsync(id)
-                                            .then(() => console.log(colors.bgYellow(`${filePath} file is updated`)))
-                                    ))
-                            ))
-                            .catch(logErr);
+                        return writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions);
                     })
+                    .then(() => console.log(colors.bgYellow(`${filePath} file is updated`)))
                     .catch(logErr);
             });
             Promise.all(operations)
@@ -471,18 +441,28 @@ const initModule = ({
             });
     };
 
-    program
-        .option('-d, --denisalexandrovichborovnev', 'Doing everything GOOD')
-        .parse(process.argv);
+    // program
+    //     .option('-d, --denisalexandrovichborovnev', 'Doing everything GOOD')
+    //     .parse(process.argv);
 
-    if (program.denisalexandrovichborovnev) {
-        regenerateSrc(false);
-    }
-    else {
-        beginInteraction();
-    }
+    // if (program.denisalexandrovichborovnev) {
+    //     regenerateSrc(false);
+    // }
+    // else {
+    //     beginInteraction();
+    // }
+    regenerateSrc(false);
 };
 
+initModule({
+    tabSize: 4,
+    srcFolder: './resxSrc/',
+    distFolder: './resxDist/',
+    resxPrefix: 'Resx',
+    jsNamespace: 'ep.resources',
+    tsGlobInterface: 'EPResources',
+    languages: ['en', 'ru', 'de', 'fr', 'es', 'it', 'pl', 'sk', 'tr'] 
+});
 module.exports = initModule;
 //                          Functionality:
 // TODO: + remove key functionality

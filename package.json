@@ -2,6 +2,10 @@
   "name": "resxprocessor",
   "version": "1.0.3",
   "description": "fast, powerfull resx -> js + ts language resource generator",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/m1lk1way/jsonResxGenerator"
+  },
   "bin": {
     "resxprocessor": "./bin/global.js"
   },
