@@ -8,6 +8,13 @@ const readFileAsync = promisify(fs.readFile);
 const readdirAsync = promisify(fs.readdir);
 const writeFileAsync = promisify(fs.writeFile);
 
+const sortObj = obj => Object.keys(obj)
+    .sort()
+    .reduce((acc, key) => {
+        acc[key] = obj[key];
+        return acc;
+    }, {});
+
 const initModule = ({
     tabSize, srcFolder, distFolder, resxPrefix, jsNamespace, tsGlobInterface, languages,
 }) => {
@@ -45,7 +52,7 @@ const initModule = ({
     const genNamespaceAssign = () => `${jsNamespace} = ${jsNamespace} || {};${NEW_LINE}`;
     const genResxObj = (content, name) => `${jsNamespace}.${name} = {${NEW_LINE}${content}${NEW_LINE}};`;
     const genResxStrs = json => {
-        const keys = Object.keys(json).sort((a, b) => a > b);
+        const keys = Object.keys(json).sort();
         return keys.map(k => `${TAB}${k}: '${json[k]}',`);
     };
     const genResxDistBody = (name, data) => {
@@ -61,7 +68,7 @@ const initModule = ({
     };
 
     const genIStrs = json => {
-        const keys = Object.keys(json).sort((a, b) => a > b);
+        const keys = Object.keys(json).sort();
         return keys.map(k => `${TAB}${k}: 'string';`);
     };
     const genIGlob = name => `declare interface ${tsGlobInterface} {${NEW_LINE}${TAB}${name}: ${name}${resxPrefix};${NEW_LINE}}`;
@@ -130,7 +137,6 @@ const initModule = ({
                             const defaultSrcPath = getDefSrcFilePath(chunkName);
                             let typeBody;
                             let typePath;
-                            let id;
 
                             return readFileAsync(defaultSrcPath, { encoding: 'utf8' })
                                 .then(defaultSrcData => {
@@ -162,62 +168,73 @@ const initModule = ({
         genLogSection('regenerating src files');
         const processChunk = chunkName => {
             const defaultLangPath = getSrcFilePath(chunkName, defaultLang);
+            let mainLangData,
+                mainLangKeys;
+
             return readFileAsync(defaultLangPath, { encoding: 'utf8' })
                 .then(defaultLangData => {
-                    const mainLangData = JSON.parse(defaultLangData);
-                    const mainLangKeys = Object.keys(mainLangData);
-                    const operations = languages.filter(lang => lang !== defaultLang)
-                        .map(currentLang => {
-                            const filePath = getSrcFilePath(chunkName, currentLang);
-                            if (!fs.existsSync(filePath)) {
-                                const body = mainLangKeys.reduce((acc, v) => {
-                                    acc[v] = null;
-                                    return acc;
-                                }, {});
-                                return writeFileAsync(filePath, JSON.stringify(body, null, 4), writeOptions)
-                                    .then(() => console.log(colors.bgYellow(`${filePath} - file is updated`)))
-                                    .catch(logErr);
-                            }
-                            return readFileAsync(filePath, { encoding: 'utf8' })
-                                .then(currLangFiledata => {
-                                    const langData = JSON.parse(currLangFiledata);
-                                    const langDataKeys = Object.keys(langData);
-                                    const absentKeys = mainLangKeys.filter(k => !(k in langData));
-                                    const extraKeys = langDataKeys.filter(k => !(k in mainLangData));
-                                    const hasExtraKeys = !!extraKeys.length;
-                                    if (absentKeys.length || hasExtraKeys) {
-                                        if (hasExtraKeys) {
-                                            extraKeys.forEach(k => {
-                                                delete langData[k];
-                                            });
-                                        }
-                                        const absentData = absentKeys.reduce((acc, k) => {
-                                            acc[k] = mainLangData[k];
-                                            return acc;
-                                        }, {});
-                                        const newLangData = {
-                                            ...langData,
-                                            ...absentData,
-                                        };
-                                        return writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions)
-                                            .then(() => {
-                                                if (hasExtraKeys) {
-                                                    console.log('----------------------');
-                                                    console.log(`${filePath} - found extra keys`);
-                                                    extraKeys.forEach(k => console.log(`'${k}' has been deleted`));
-                                                    console.log(colors.bgYellow(`${filePath} - file is updated`));
-                                                    console.log('----------------------');
-                                                }
-                                                else {
-                                                    console.log(colors.bgYellow(`${filePath} - file is updated`));
-                                                }
-                                            })
-                                            .catch(logErr);
-                                    }
-                                    return console.log(`${filePath} - file is up to date`);
-                                })
+                    mainLangData = sortObj(JSON.parse(defaultLangData));
+                    mainLangKeys = Object.keys(mainLangData);
+                })
+                .then(() => {
+                    writeFileAsync(defaultLangPath, JSON.stringify(mainLangData, null, 4), mainLangData);
+                })
+                .then(() => {
+                    const operations = languages.filter(lang => lang !== defaultLang).map(currentLang => {
+                        const filePath = getSrcFilePath(chunkName, currentLang);
+                        let extraKeys,
+                            hasExtraKeys;
+                        if (!fs.existsSync(filePath)) {
+                            const body = mainLangKeys.reduce((acc, v) => {
+                                acc[v] = null;
+                                return acc;
+                            }, {});
+                            return writeFileAsync(filePath, JSON.stringify(body, null, 4), writeOptions)
+                                .then(() => console.log(colors.bgYellow(`${filePath} - file is updated`)))
                                 .catch(logErr);
-                        });
+                        }
+                        return readFileAsync(filePath, { encoding: 'utf8' })
+                            .then(currLangFiledata => {
+                                let langData = JSON.parse(currLangFiledata);
+                                const langDataKeys = Object.keys(langData);
+                                const absentKeys = mainLangKeys.filter(k => !(k in langData));
+                                
+                                extraKeys = langDataKeys.filter(k => !(k in mainLangData));
+                                hasExtraKeys = !!extraKeys.length;
+
+                                if (absentKeys.length || hasExtraKeys) {
+                                    if (hasExtraKeys) {
+                                        extraKeys.forEach(k => {
+                                            delete langData[k];
+                                        });
+                                    }
+                                    const absentData = absentKeys.reduce((acc, k) => {
+                                        acc[k] = mainLangData[k];
+                                        return acc;
+                                    }, {});
+
+                                    langData = {
+                                        ...langData,
+                                        ...absentData,
+                                    };
+                                }
+                                return sortObj(langData);
+                            })
+                            .then(newLangData => writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions))
+                            .then(() => {
+                                if (hasExtraKeys) {
+                                    console.log('----------------------');
+                                    console.log(`${filePath} - found extra keys`);
+                                    extraKeys.forEach(k => console.log(`'${k}' has been deleted`));
+                                    console.log(colors.bgYellow(`${filePath} - file is updated`));
+                                    console.log('----------------------');
+                                }
+                                else {
+                                    console.log(`${filePath} - file is up to date`);
+                                }
+                            })
+                            .catch(logErr);
+                    });
                     return Promise.all(operations).then(() => {});
                 })
                 .catch(logErr);
@@ -461,7 +478,7 @@ initModule({
     resxPrefix: 'Resx',
     jsNamespace: 'ep.resources',
     tsGlobInterface: 'EPResources',
-    languages: ['en', 'ru', 'de', 'fr', 'es', 'it', 'pl', 'sk', 'tr'] 
+    languages: ['en', 'ru', 'de', 'fr', 'es', 'it', 'pl', 'sk', 'tr'],
 });
 module.exports = initModule;
 //                          Functionality:
