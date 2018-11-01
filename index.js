@@ -494,7 +494,7 @@ const initModule = ({
         .option('-d, --dogood', 'Doing everything GOOD')
         .parse(process.argv);
 
-    if (program.denisalexandrovichborovnev) {
+    if (program.dogood) {
         regenerateSrc(false);
     }
     else {
