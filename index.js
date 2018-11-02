@@ -89,7 +89,7 @@ const initModule = ({
 
     const genIStrs = json => {
         const keys = Object.keys(json).sort();
-        return keys.map(k => `${TAB}${k}: 'string';`);
+        return keys.map(k => `${TAB}${k}: string;`);
     };
     const genIGlob = name => `declare interface ${tsGlobInterface} {${NEW_LINE}${TAB}${name}: ${name}${resxPrefix};${NEW_LINE}}`;
     const genIObj = (content, name) => `interface ${name}${resxPrefix} {${NEW_LINE}${content}${NEW_LINE}}`;
