@@ -3,6 +3,7 @@ const { promisify } = require('util');
 const inquirer = require('inquirer');
 const program = require('commander');
 const colors = require('colors');
+const jsStringEscape = require('js-string-escape');
 
 const readFileAsync = promisify(fs.readFile);
 const readdirAsync = promisify(fs.readdir);
@@ -62,7 +63,7 @@ const initModule = ({
     const genResxObj = (content, name) => `${jsNamespace}.${name} = {${NEW_LINE}${content}${NEW_LINE}};`;
     const genResxStrs = json => {
         const keys = Object.keys(json).sort();
-        return keys.map(k => `${TAB}${k}: '${json[k]}',`);
+        return keys.map(k => `${TAB}${k}: '${jsStringEscape(json[k])}',`);
     };
     const genResxDistBody = (name, langData, defaultLangData) => {
         let distData = langData;
