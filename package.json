@@ -12,7 +12,8 @@
   "main": "index.js",
   "scripts": {
     "test": "eslint --ignore-path .gitignore .",
-    "start": "node index.js"
+    "start": "node ./bin/global.js",
+    "debug": "node --nolazy --inspect-brk=9229 ./bin/global.js -d"
   },
   "preferGlobal": true,
   "author": "",
