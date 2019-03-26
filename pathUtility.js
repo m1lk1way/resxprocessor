@@ -26,12 +26,16 @@ class PathUtility {
         return `${this.distFolder}${chunkName}${this.resxPrefix}.${lang}.js`;
     }
 
+    getDistWrapperPath(chunkName) {
+        return `${this.distFolder}${chunkName}${this.resxPrefix}.ts`;
+    }
+
     getDefDistFilePath(chunkName) {
         return this.getDistFilePath(chunkName, this.defaultLang);
     }
 
     getDefTypesPath(chunkName) {
-        return `${this.distFolder}${chunkName}${this.resxPrefix}.${this.defaultLang}.d.ts`;
+        return `${this.distFolder}${chunkName}${this.resxPrefix}.def.d.ts`;
     }
 
     static getChunkByFileName(fileName) {
