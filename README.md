@@ -1,5 +1,5 @@
 # resxprocessor
-[![Build Status](https://travis-ci.org/m1lk1way/jsonResxGenerator.svg?branch=master)](https://travis-ci.org/m1lk1way/jsonResxGenerator)
+[![Build Status](https://travis-ci.org/m1lk1way/resxprocessor.svg?branch=master)](https://travis-ci.org/m1lk1way/resxprocessor)
 
 This package offers you:
   - Create .json language source files by given languages (through configuration .resxprocessor)
