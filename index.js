@@ -3,32 +3,36 @@ const { promisify } = require('util');
 const inquirer = require('inquirer');
 const program = require('commander');
 const colors = require('colors');
-const jsStringEscape = require('js-string-escape');
-const DistGenerator = require('./distGenerator');
-const PathUtility = require('./pathUtility');
-const LogUtility = require('./logUtility');
+const DistGenerator = require('./generators/distGenerator');
+const SrcGenerator = require('./generators/srcGenerator');
+const PathUtility = require('./utils/pathUtility');
+const LogUtility = require('./utils/logUtility');
+const Markup = require('./utils/markupUtility');
 
 const readFileAsync = promisify(fs.readFile);
-const readdirAsync = promisify(fs.readdir);
 const writeFileAsync = promisify(fs.writeFile);
-
-const sortObj = obj => Object.keys(obj)
-    .sort()
-    .reduce((acc, key) => {
-        acc[key] = obj[key];
-        return acc;
-    }, {});
 
 const initModule = ({
     tabSize, srcFolder, distFolder, resxPrefix, jsNamespace, tsGlobInterface, languages, defaultLang, currentLangNS,
 }) => {
     /* utilities initialization */
-    const pathUtility = new PathUtility(srcFolder, distFolder, defaultLang, resxPrefix);
+    const pathUtility = new PathUtility();
+    pathUtility.init(srcFolder, distFolder, defaultLang, resxPrefix);
+
+    const markupUtility = new Markup();
+    markupUtility.init(tabSize);
+
+    const srcGenerator = new SrcGenerator(languages, defaultLang, srcFolder);
     const distGenerator = new DistGenerator(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS, tsGlobInterface);
-    
     /* END */
-    const NEW_LINE = '\r\n';
-    // const TAB = new Array(parseInt(tabSize, 10) + 1).join(' ');
+
+    const generateAll = () => {
+        srcGenerator.generateAll()
+            .then(() => distGenerator.generateAll())
+            .then(() => LogUtility.logSuccess())
+            .catch(LogUtility.logErr);
+    };
+
     const writeOptions = { flag: 'w', mode: 666, encoding: 'utf8' };
     const yesNo = {
         yes: 'Yes',
@@ -49,10 +53,6 @@ const initModule = ({
     };
     checkCfgPathSync(srcFolder);
     checkCfgPathSync(distFolder);
-
-    const getChunkByFileName = fileName => fileName.split('.')[0];
-    const getChunksNames = fileNames => fileNames.map(getChunkByFileName)
-        .filter((v, i, a) => a.indexOf(v) === i);
         
     const askForRecursiveActions = () => {
         inquirer
@@ -66,117 +66,6 @@ const initModule = ({
                 if (a.newKey === yesNo.yes) {
                     beginInteraction();
                 }
-            });
-    };
-
-    const regenerateSrc = (interactive = true) => {
-        LogUtility.logSection('regenerating src files');
-
-        const processChunk = chunkName => {
-            const defaultLangPath = pathUtility.getDefSrcFilePath(chunkName);
-            let mainLangData,
-                mainLangKeys;
-
-            return readFileAsync(defaultLangPath, { encoding: 'utf8' })
-                .then(defaultLangData => {
-                    mainLangData = sortObj(JSON.parse(defaultLangData));
-                    mainLangKeys = Object.keys(mainLangData);
-                })
-                .then(() => {
-                    writeFileAsync(defaultLangPath, JSON.stringify(mainLangData, null, 4), mainLangData);
-                })
-                .then(() => {
-                    const operations = languages.filter(lang => lang !== defaultLang).map(currentLang => {
-                        const filePath = pathUtility.getSrcFilePath(chunkName, currentLang);
-                        let extraKeys,
-                            hasExtraKeys;
-                        if (!fs.existsSync(filePath)) {
-                            const body = mainLangKeys.reduce((acc, v) => {
-                                acc[v] = null;
-                                return acc;
-                            }, {});
-                            return writeFileAsync(filePath, JSON.stringify(body, null, 4), writeOptions)
-                                .then(() => console.log(colors.bgYellow(`${filePath} - file is updated`)))
-                                .catch(LogUtility.logErr);
-                        }
-                        return readFileAsync(filePath, { encoding: 'utf8' })
-                            .then(currLangFiledata => {
-                                let langData = JSON.parse(currLangFiledata);
-                                const langDataKeys = Object.keys(langData);
-                                const absentKeys = mainLangKeys.filter(k => !(k in langData));
-                                
-                                extraKeys = langDataKeys.filter(k => !(k in mainLangData));
-                                hasExtraKeys = !!extraKeys.length;
-
-                                if (absentKeys.length || hasExtraKeys) {
-                                    if (hasExtraKeys) {
-                                        extraKeys.forEach(k => {
-                                            delete langData[k];
-                                        });
-                                    }
-                                    const absentData = absentKeys.reduce((acc, k) => {
-                                        acc[k] = null;
-                                        return acc;
-                                    }, {});
-
-                                    langData = {
-                                        ...langData,
-                                        ...absentData,
-                                    };
-                                }
-                                return sortObj(langData);
-                            })
-                            .then(newLangData => writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions))
-                            .then(() => {
-                                if (hasExtraKeys) {
-                                    console.log('----------------------');
-                                    console.log(`${filePath} - found extra keys`);
-                                    extraKeys.forEach(k => console.log(`'${k}' has been deleted`));
-                                    console.log(colors.bgYellow(`${filePath} - file is updated`));
-                                    console.log('----------------------');
-                                }
-                                else {
-                                    console.log(`${filePath} - file is up to date`);
-                                }
-                            })
-                            .catch(LogUtility.logErr);
-                    });
-                    
-                    return Promise.all(operations);
-                })
-                .catch(LogUtility.logErr);
-        };
-
-        let chunks;
-        readdirAsync(srcFolder)
-            .then(fileNames => {
-                chunks = getChunksNames(fileNames);
-                const ops = chunks.map(c => processChunk(c));
-
-                return Promise.all(ops);
-            })
-            .then(() => {
-                const ops = chunks.map(c => distGenerator.regenerateChunkDist(c));
-                return Promise.all(ops);
-                // DistGenerator.regenerateDist(srcFolder, interactive);
-            })
-            .then(() => {
-                LogUtility.logSuccess();
-            })
-            .catch(LogUtility.logErr);
-    };
-
-    const generateEmptyChunk = (chunkName, callback) => {
-        const operations = languages.map(l => {
-            const filePath = pathUtility.getSrcFilePath(chunkName, l);
-            return writeFileAsync(filePath, JSON.stringify({}), writeOptions)
-                .then(() => console.log(`${filePath} empty resource file was created`))
-                .catch(LogUtility.logErr);
-        });
-
-        Promise.all(operations)
-            .then(() => {
-                callback(chunkName);
             });
     };
 
@@ -238,9 +127,9 @@ const initModule = ({
             },
         ];
 
-        const doAdd = (resxName, keyName, keyLangs, langValPairs) => {
+        const doAdd = (chunkName, keyName, keyLangs, langValPairs) => {
             const operations = keyLangs.map(l => {
-                const filePath = pathUtility.getSrcFilePath(resxName, l);
+                const filePath = pathUtility.getSrcFilePath(chunkName, l);
                 return readFileAsync(filePath, { encoding: 'utf8' })
                     .then(langData => {
                         const content = JSON.parse(langData);
@@ -265,9 +154,9 @@ const initModule = ({
                         })
                         .then(a => {
                             if (a.newKey === yesNo.yes) {
-                                addScenario(resxName);
+                                addScenario(chunkName);
                             }
-                            else (regenerateSrc());
+                            else (distGenerator.generateChunk(chunkName));
                         });
                 });
         };
@@ -326,7 +215,7 @@ const initModule = ({
                         }
                     });
             };
-            generateEmptyChunk(resxName, callback);
+            srcGenerator.generateEmptyChunk(resxName, callback);
         };
 
         const createSelectChankQuestion = chunkNames => {
@@ -340,21 +229,21 @@ const initModule = ({
         };
 
         const readChunksAndAsk = () => {
-            readdirAsync(srcFolder)
-                .then(srcDirData => {
-                    if (!srcDirData.length) {
+            pathUtility.readChunksNames()
+                .then(chunkNames => {
+                    if (!chunkNames.length) {
                         LogUtility.logErr(`NO RESOURCES FOUND IN ${srcFolder}`);
                         askForRecursiveActions();
                         return;
                     }
-                    const question = createSelectChankQuestion(getChunksNames(srcDirData));
+                    const question = createSelectChankQuestion(chunkNames);
                     inquirer
                         .prompt(question)
                         .then(a => {
                             addScenario(a.addKey);
                         });
                 })
-                .catch(LogUtility.logErr);
+                .catch(LogUtility.logErr)
         };
 
         inquirer
@@ -367,7 +256,7 @@ const initModule = ({
                     createScenario(a.resxName);
                 }
                 if (a.action === actions.regenerateAll) {
-                    regenerateSrc(false);
+                    generateAll();
                 }
             });
     };
@@ -377,7 +266,7 @@ const initModule = ({
         .parse(process.argv);
 
     if (program.dogood) {
-        regenerateSrc(false);
+        generateAll();
     }
     else {
         beginInteraction();
@@ -385,3 +274,5 @@ const initModule = ({
 };
 
 module.exports = initModule;
+
+// todo: fix interactive mode and move all questions to its own utility;

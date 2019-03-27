@@ -1,17 +1,24 @@
+const fs = require('fs');
+const { promisify } = require('util');
+const LogUtility = require('../utils/logUtility');
+
+const readdirAsync = promisify(fs.readdir);
+
 let instance;
 
 class PathUtility {
-    constructor(srcFolder, distFolder, defaultLang, resxPrefix) {
+    constructor() {
         if (instance) {
             return instance;
         }
+        instance = this;
+    }
 
+    init(srcFolder, distFolder, defaultLang, resxPrefix) {
         this.defaultLang = defaultLang;
         this.srcFolder = srcFolder;
         this.distFolder = distFolder;
         this.resxPrefix = resxPrefix;
-        
-        instance = this;
     }
 
     getSrcFilePath(chunkName, lang) {
@@ -45,6 +52,15 @@ class PathUtility {
     static getChunksNames(fileNames) {
         return fileNames.map(PathUtility.getChunkByFileName)
             .filter((v, i, a) => a.indexOf(v) === i);
+    }
+
+    readChunksNames() {
+        return readdirAsync(this.srcFolder)
+            .then(fileNames => {
+                const chunks = PathUtility.getChunksNames(fileNames);
+                return chunks;
+            })
+            .catch(LogUtility.logErr);
     }
 }
 

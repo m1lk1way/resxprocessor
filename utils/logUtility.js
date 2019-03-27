@@ -1,0 +1,33 @@
+const colors = require('colors');
+
+class LogUtility {
+    static logErr(err) {
+        console.log(colors.red(`ERROR: ${err}, \r\n${err.stack}`));
+    }
+
+    static logSuccess() {
+        console.log(colors.green('-----------------------'));
+        console.log(colors.green('EVERYTHING IS OK. Enjoy ^_^'));
+        console.log(colors.green('-----------------------'));
+    }
+
+    static logSection(sectionText) {
+        console.log('-----------------------');
+        console.log(`${sectionText}`);
+        console.log('-----------------------');
+    }
+
+    static logChunkCreate(chunkName) {
+        LogUtility.logSection(`Empty chunk ${colors.green(chunkName)} was created`);
+    }
+
+    static logFileUpdate(file) {
+        console.log(colors.yellow(`${file} - file was updated`));
+    }
+
+    static logKeyDelete(key) {
+        console.log(colors.red(`${key} - key was deleted`));
+    }
+}
+
+module.exports = LogUtility;
