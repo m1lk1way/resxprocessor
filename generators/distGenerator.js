@@ -88,7 +88,6 @@ class DistGenerator {
         const content = DistGenerator.genResxGetterStrs(keys, this.defaultLang, this.currentLangNS);
         const resxObj = DistGenerator.genResxObj(content, wrapperChunkName);
         const nameSpaceAssign = this.genAssignToNameSpace(chunkName, wrapperChunkName);
-
         const body = [
             markup.autoGenStr,
             imports,
@@ -101,6 +100,7 @@ class DistGenerator {
             resxObj,
             markup.newLine,
             markup.newLine,
+            this.genNameSpaceAssign(),
             nameSpaceAssign,
         ].join('');
 
