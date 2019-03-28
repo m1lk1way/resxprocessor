@@ -1,3 +1,5 @@
+const os = require('os');
+
 let instance;
 
 class MarkupUtility {
@@ -5,7 +7,7 @@ class MarkupUtility {
         if (instance) {
             return instance;
         }
-        this.i_newLine = '\r\n';
+        this.i_newLine = os.EOL;
         instance = this;
     }
 
@@ -36,6 +38,11 @@ class MarkupUtility {
 
     get tab() {
         return this.i_tab;
+    }
+
+    static toSanitizedString(json) {
+        const dataString = JSON.stringify(json, null, 4);
+        return dataString.replace(/\n/g, os.EOL);
     }
 }
 

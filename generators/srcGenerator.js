@@ -4,6 +4,7 @@ const LogUtility = require('../utils/logUtility');
 const PathUtility = require('../utils/pathUtility');
 const SortUtility = require('../utils/sortUtility');
 const fsOptions = require('../utils/fsOptions');
+const Markup = require('../utils/markupUtility');
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
@@ -96,7 +97,7 @@ class SrcGenerator {
                             acc[v] = null;
                             return acc;
                         }, {});
-                        return writeFileAsync(filePath, JSON.stringify(body, null, 4), fsOptions.write)
+                        return writeFileAsync(filePath, Markup.toSanitizedString(body), fsOptions.write)
                             .then(() => LogUtility.logSuccess(filePath))
                             .catch(LogUtility.logErr);
                     }
@@ -127,7 +128,7 @@ class SrcGenerator {
                             }
                             return SortUtility.sort(langData);
                         })
-                        .then(newLangData => writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), fsOptions.write))
+                        .then(newLangData => writeFileAsync(filePath, Markup.toSanitizedString(newLangData), fsOptions.write))
                         .then(() => {
                             if (hasExtraKeys) {
                                 console.log('----------------------');
