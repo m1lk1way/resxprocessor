@@ -1,16 +1,10 @@
-const fs = require('fs');
-const { promisify } = require('util');
 const inquirer = require('inquirer');
 const program = require('commander');
-const colors = require('colors');
 const DistGenerator = require('./generators/distGenerator');
 const SrcGenerator = require('./generators/srcGenerator');
 const PathUtility = require('./utils/pathUtility');
 const LogUtility = require('./utils/logUtility');
 const Markup = require('./utils/markupUtility');
-
-const readFileAsync = promisify(fs.readFile);
-const writeFileAsync = promisify(fs.writeFile);
 
 const initModule = ({
     tabSize, srcFolder, distFolder, resxPrefix, jsNamespace, tsGlobInterface, languages, defaultLang, currentLangNS,
@@ -25,7 +19,7 @@ const initModule = ({
     const srcGenerator = new SrcGenerator(languages, defaultLang, srcFolder);
     const distGenerator = new DistGenerator(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS, tsGlobInterface);
     /* END */
-
+    
     const generateAll = () => {
         srcGenerator.generateAll()
             .then(() => distGenerator.generateAll())
@@ -33,7 +27,6 @@ const initModule = ({
             .catch(LogUtility.logErr);
     };
 
-    const writeOptions = { flag: 'w', mode: 666, encoding: 'utf8' };
     const yesNo = {
         yes: 'Yes',
         no: 'No',
@@ -43,16 +36,6 @@ const initModule = ({
         { name: yesNo.yes },
         { name: yesNo.no },
     ];
-
-    const checkCfgPathSync = path => {
-        if (!fs.existsSync(path)) {
-            console.log(`didn't find ${path}, you specified in .resxprocessor cfg file`);
-            fs.mkdirSync(path);
-            console.log('created it for you');
-        }
-    };
-    checkCfgPathSync(srcFolder);
-    checkCfgPathSync(distFolder);
         
     const askForRecursiveActions = () => {
         inquirer
@@ -78,7 +61,7 @@ const initModule = ({
 
         const actonsList = [
             { name: 'Do everything GOOD', value: actions.regenerateAll },
-            { name: 'Create new resx File', value: actions.create },
+            { name: 'Create new resx', value: actions.create },
             { name: 'Add keys to existing one', value: actions.add },
         ];
 
@@ -92,13 +75,13 @@ const initModule = ({
                 message: 'Give it a name: ',
                 when: a => a.action === actions.create,
                 validate: resxName => {
-                    const exists = fs.existsSync(pathUtility.getDefSrcFilePath(resxName));
+                    const exists = SrcGenerator.checkChunkExistance(resxName);
                     return exists ? 'Resource file already exists' : true;
                 },
             },
         ];
 
-        const createDefaultLangs = [defaultLang, 'ru'];
+        const defaultSelectedLangs = [defaultLang, 'ru'];
         const langList = languages.map(l => ({ name: l }));
 
         const doLangKeyValQuestions = (lang, keyName) => ({
@@ -114,7 +97,7 @@ const initModule = ({
                 name: 'keyName',
                 message: 'Key name? ',
                 validate: a => {
-                    const fileContent = JSON.parse(fs.readFileSync(pathUtility.getDefSrcFilePath(resxName), 'utf8'));
+                    const fileContent = SrcGenerator.readDefaultLangChunk(resxName);
                     return a in fileContent ? 'This key is already exists' : true;
                 },
             },
@@ -123,27 +106,17 @@ const initModule = ({
                 name: 'keyLangs',
                 message: 'Select languages:',
                 choices: langList,
-                default: createDefaultLangs,
+                default: defaultSelectedLangs,
+                validate: list => {
+                    const isDefaultLangSelected = list.includes(defaultLang);
+                    return isDefaultLangSelected ? true : `Default language (${defaultLang}) must be selected`;
+                },
             },
         ];
 
-        const doAdd = (chunkName, keyName, keyLangs, langValPairs) => {
-            const operations = keyLangs.map(l => {
-                const filePath = pathUtility.getSrcFilePath(chunkName, l);
-                return readFileAsync(filePath, { encoding: 'utf8' })
-                    .then(langData => {
-                        const content = JSON.parse(langData);
-                        const langVal = langValPairs[l];
-                        const newLangData = {
-                            ...content,
-                            [keyName]: langVal,
-                        };
-                        return writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions);
-                    })
-                    .then(() => console.log(colors.bgYellow(`${filePath} file is updated`)))
-                    .catch(LogUtility.logErr);
-            });
-            Promise.all(operations)
+        const doAdd = (chunkName, keyName, langValPairs) => {
+            SrcGenerator.addKey(chunkName, keyName, langValPairs)
+                .then(() => distGenerator.generateChunk(chunkName, 'updated'))
                 .then(() => {
                     inquirer
                         .prompt({
@@ -153,10 +126,12 @@ const initModule = ({
                             choices: yesNoList,
                         })
                         .then(a => {
-                            if (a.newKey === yesNo.yes) {
-                                addScenario(chunkName);
+                            switch (a.newKey) {
+                                case yesNo.yes:
+                                    return addScenario(chunkName);
+                                default:
+                                    return askForRecursiveActions();
                             }
-                            else (distGenerator.generateChunk(chunkName));
                         });
                 });
         };
@@ -165,6 +140,7 @@ const initModule = ({
             const askForValues = (keyName, keyLangs) => {
                 const langValPairs = [];
                 let iteration = 0;
+                
                 const askForValue = () => {
                     const currLang = keyLangs[iteration];
                     if (langValPairs.length < keyLangs.length) {
@@ -183,9 +159,11 @@ const initModule = ({
                             acc[key] = val[key];
                             return acc;
                         }, {});
-                        doAdd(resxName, keyName, keyLangs, langData);
+
+                        doAdd(resxName, keyName, langData);
                     }
                 };
+
                 askForValue();
             };
 
@@ -200,25 +178,31 @@ const initModule = ({
             askForKey();
         };
 
-        const createScenario = resxName => {
-            const callback = name => {
-                inquirer
-                    .prompt({
-                        type: 'list',
-                        name: 'addKey',
-                        message: 'add keys??',
-                        choices: yesNoList,
-                    })
-                    .then(a => {
-                        if (a.addKey === yesNo.yes) {
-                            addScenario(name);
-                        }
-                    });
-            };
-            srcGenerator.generateEmptyChunk(resxName, callback);
+        const askForAddKeys = chunkName => {
+            inquirer
+                .prompt({
+                    type: 'list',
+                    name: 'addKey',
+                    message: 'add keys??',
+                    choices: yesNoList,
+                })
+                .then(a => {
+                    switch (a.addKey) {
+                        case yesNo.yes:
+                            return addScenario(chunkName);
+                        default:
+                            return askForRecursiveActions();
+                    }
+                });
         };
 
-        const createSelectChankQuestion = chunkNames => {
+        const createScenario = resxName => {
+            srcGenerator.generateEmptyChunk(resxName)
+                .then(() => distGenerator.generateChunk(resxName, 'created'))
+                .then(() => askForAddKeys(resxName));
+        };
+
+        const createSelectChunkQuestion = chunkNames => {
             const chunkList = chunkNames.map(chunkName => ({ name: chunkName }));
             return {
                 type: 'list',
@@ -236,14 +220,14 @@ const initModule = ({
                         askForRecursiveActions();
                         return;
                     }
-                    const question = createSelectChankQuestion(chunkNames);
+                    const question = createSelectChunkQuestion(chunkNames);
                     inquirer
                         .prompt(question)
                         .then(a => {
                             addScenario(a.addKey);
                         });
                 })
-                .catch(LogUtility.logErr)
+                .catch(LogUtility.logErr);
         };
 
         inquirer

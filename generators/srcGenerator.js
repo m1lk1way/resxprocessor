@@ -2,6 +2,7 @@ const fs = require('fs');
 const { promisify } = require('util');
 const LogUtility = require('../utils/logUtility');
 const PathUtility = require('../utils/pathUtility');
+const SortUtility = require('../utils/sortUtility');
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
@@ -17,17 +18,42 @@ class SrcGenerator {
         this.srcFolder = srcFolder;
     }
 
-    static sortSrc(obj) {
-        const sortedSrc = Object.keys(obj)
-            .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
-            .reduce((acc, key) => {
-                acc[key] = obj[key];
-                return acc;
-            }, {});
-
-        return sortedSrc;
+    static checkChunkExistance(chunkName) {
+        return fs.existsSync(pathUtility.getDefSrcFilePath(chunkName));
     }
 
+    static readDefaultLangChunk(chunkName) {
+        const fileData = fs.readFileSync(pathUtility.getDefSrcFilePath(chunkName), 'utf8');
+        return JSON.parse(fileData);
+    }
+
+    static addKey(chunkName, keyName, langValPairs) {
+        const langsToAdd = Object.keys(langValPairs);
+        
+        const ops = langsToAdd.map(lang => {
+            const filePath = pathUtility.getSrcFilePath(chunkName, lang);
+            return readFileAsync(filePath, { encoding: 'utf8' })
+                .then(langData => {
+                    const content = JSON.parse(langData);
+                    const langVal = langValPairs[lang];
+                    const newLangData = {
+                        ...content,
+                        [keyName]: langVal,
+                    };
+
+                    return writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions);
+                })
+                .then(() => {
+                    LogUtility.logLine();
+                    LogUtility.logKeyAdd(keyName, filePath);
+                })
+                .catch(LogUtility.logErr);
+        });
+
+        return Promise.all(ops)
+            .catch(LogUtility.logErr);
+    }
+    
     generateAll() {
         return pathUtility.readChunksNames()
             .then(chunks => {
@@ -38,7 +64,7 @@ class SrcGenerator {
             .catch(LogUtility.logErr);
     }
 
-    generateEmptyChunk(chunkName, callback) {
+    generateEmptyChunk(chunkName) {
         const operations = this.languages.map(lang => {
             const filePath = pathUtility.getSrcFilePath(chunkName, lang);
             return writeFileAsync(filePath, JSON.stringify({}), writeOptions);
@@ -46,8 +72,7 @@ class SrcGenerator {
 
         return Promise.all(operations)
             .then(() => {
-                LogUtility.logChunkCreate(chunkName);
-                callback(chunkName);
+                LogUtility.logChunkOperation(chunkName, 'Src', 'created');
             });
     }
 
@@ -59,7 +84,7 @@ class SrcGenerator {
         return readFileAsync(defaultLangPath, { encoding: 'utf8' })
             .then(defaultLangData => {
                 const srcData = JSON.parse(defaultLangData);
-                mainLangData = SrcGenerator.sortSrc(srcData);
+                mainLangData = SortUtility.sort(srcData);
                 mainLangKeys = Object.keys(mainLangData);
             })
             .then(() => {
@@ -101,7 +126,7 @@ class SrcGenerator {
                                     ...absentData,
                                 };
                             }
-                            return SrcGenerator.sortSrc(langData);
+                            return SortUtility.sort(langData);
                         })
                         .then(newLangData => writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions))
                         .then(() => {

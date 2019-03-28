@@ -65,7 +65,7 @@ class DistGenerator {
     }
 
     static processJsonToJs(body, filePath) {
-        return writeFileAsync(filePath, body + markup.newLine, writeOptions)
+        return writeFileAsync(filePath, body + markup.newLine, writeOptions);
     }
 
     static getSortedSrcKeys(fileData) {
@@ -160,7 +160,7 @@ class DistGenerator {
         return writeFileAsync(typePath, typeBody + markup.newLine, writeOptions);
     }
 
-    generateChunk(chunkName) {
+    generateChunk(chunkName, createMode) {
         const chunkDefaultSrc = pathUtility.getDefSrcFilePath(chunkName);
         return readFileAsync(chunkDefaultSrc, { encoding: 'utf8' })
             .then(srcLangFileData => {
@@ -169,7 +169,12 @@ class DistGenerator {
 
                 return Promise.all([wrapperRegenOp, typesRegenOp]);
             })
-            .then(() => this.generateChunkLangs(chunkName));
+            .then(() => this.generateChunkLangs(chunkName))
+            .then(() => {
+                if (createMode) {
+                    LogUtility.logChunkOperation(chunkName, 'Dist', createMode);
+                }
+            });
     }
 
     generateChunkLangs(chunkName) {

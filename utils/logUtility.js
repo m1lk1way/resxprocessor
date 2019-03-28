@@ -4,6 +4,10 @@ class LogUtility {
     static logErr(err) {
         console.log(colors.red(`ERROR: ${err}, \r\n${err.stack}`));
     }
+    
+    static logLine() {
+        console.log('-----------------------');
+    }
 
     static logSuccess() {
         console.log(colors.green('-----------------------'));
@@ -17,12 +21,16 @@ class LogUtility {
         console.log('-----------------------');
     }
 
-    static logChunkCreate(chunkName) {
-        LogUtility.logSection(`Empty chunk ${colors.green(chunkName)} was created`);
+    static logChunkOperation(chunkName, chunkType, operation) {
+        LogUtility.logSection(`${chunkType} chunk ${colors.green(chunkName)} was ${colors.green(operation)}`);
     }
 
     static logFileUpdate(file) {
         console.log(colors.yellow(`${file} - file was updated`));
+    }
+    
+    static logKeyAdd(key, file) {
+        console.log(`added key ${colors.yellow(key)} to ${file}`);
     }
 
     static logKeyDelete(key) {

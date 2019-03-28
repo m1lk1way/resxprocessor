@@ -19,6 +19,17 @@ class PathUtility {
         this.srcFolder = srcFolder;
         this.distFolder = distFolder;
         this.resxPrefix = resxPrefix;
+        
+        PathUtility.checkPathOrCreate(srcFolder);
+        PathUtility.checkPathOrCreate(distFolder);
+    }
+
+    static checkPathOrCreate(path) {
+        if (!fs.existsSync(path)) {
+            console.log(`didn't find ${path}, you specified in .resxprocessor cfg file`);
+            fs.mkdirSync(path);
+            console.log('created it for you');
+        }
     }
 
     getSrcFilePath(chunkName, lang) {

@@ -11,7 +11,7 @@
         "comma-dangle": ["error", "always-multiline"],
         "no-trailing-spaces": ["error", { "skipBlankLines": true }],
         "arrow-parens": ["error", "as-needed"],
-        "indent": ["error", 4],
+        "indent": ["error", 4, { "SwitchCase": 1 }],
         "linebreak-style": 0,
         "no-console": 0,
         "no-use-before-define": ["error", { "variables": false }],
