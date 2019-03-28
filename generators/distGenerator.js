@@ -4,11 +4,10 @@ const jsStringEscape = require('js-string-escape');
 const LogUtility = require('../utils/logUtility');
 const PathUtility = require('../utils/pathUtility');
 const MarkupUtility = require('../utils/markupUtility');
+const fsOptions = require('../utils/fsOptions');
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
-
-const writeOptions = { flag: 'w', mode: 666, encoding: 'utf8' }; // перетянуть, повторения выкосить
 
 const pathUtility = new PathUtility();
 const markup = new MarkupUtility();
@@ -65,7 +64,7 @@ class DistGenerator {
     }
 
     static processJsonToJs(body, filePath) {
-        return writeFileAsync(filePath, body + markup.newLine, writeOptions);
+        return writeFileAsync(filePath, body + markup.newLine, fsOptions.write);
     }
 
     static getSortedSrcKeys(fileData) {
@@ -83,7 +82,7 @@ class DistGenerator {
 
     genResxWrapperBody(fileData, chunkName) {
         const wrapperChunkName = chunkName + this.resxPrefix;
-        const keys = DistGenerator.getSortedSrcKeys(fileData);
+        const keys = DistGenerator.getSortedSrcKeys(fileData); // use sort from sortUtility here
         const imports = DistGenerator.generateNamedImports(chunkName, this.languages, this.resxPrefix);
         const langsMapObj = this.genLangsMapObj(chunkName);
         const content = DistGenerator.genResxGetterStrs(keys, this.defaultLang, this.currentLangNS);
@@ -157,7 +156,7 @@ class DistGenerator {
     generateTypes(srcLangFileData, chunkName) {
         const typePath = pathUtility.getDefTypesPath(chunkName);
         const typeBody = this.genTypesBody(chunkName, srcLangFileData);
-        return writeFileAsync(typePath, typeBody + markup.newLine, writeOptions);
+        return writeFileAsync(typePath, typeBody + markup.newLine, fsOptions.write);
     }
 
     generateChunk(chunkName, createMode) {

@@ -3,11 +3,10 @@ const { promisify } = require('util');
 const LogUtility = require('../utils/logUtility');
 const PathUtility = require('../utils/pathUtility');
 const SortUtility = require('../utils/sortUtility');
+const fsOptions = require('../utils/fsOptions');
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
-
-const writeOptions = { flag: 'w', mode: 666, encoding: 'utf8' }; // перетянуть, повторения выкосить
 
 const pathUtility = new PathUtility();
 
@@ -41,7 +40,7 @@ class SrcGenerator {
                         [keyName]: langVal,
                     };
 
-                    return writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions);
+                    return writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), fsOptions.write);
                 })
                 .then(() => {
                     LogUtility.logLine();
@@ -67,7 +66,7 @@ class SrcGenerator {
     generateEmptyChunk(chunkName) {
         const operations = this.languages.map(lang => {
             const filePath = pathUtility.getSrcFilePath(chunkName, lang);
-            return writeFileAsync(filePath, JSON.stringify({}), writeOptions);
+            return writeFileAsync(filePath, JSON.stringify({}), fsOptions.write);
         });
 
         return Promise.all(operations)
@@ -97,7 +96,7 @@ class SrcGenerator {
                             acc[v] = null;
                             return acc;
                         }, {});
-                        return writeFileAsync(filePath, JSON.stringify(body, null, 4), writeOptions)
+                        return writeFileAsync(filePath, JSON.stringify(body, null, 4), fsOptions.write)
                             .then(() => LogUtility.logSuccess(filePath))
                             .catch(LogUtility.logErr);
                     }
@@ -128,7 +127,7 @@ class SrcGenerator {
                             }
                             return SortUtility.sort(langData);
                         })
-                        .then(newLangData => writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), writeOptions))
+                        .then(newLangData => writeFileAsync(filePath, JSON.stringify(newLangData, null, 4), fsOptions.write))
                         .then(() => {
                             if (hasExtraKeys) {
                                 console.log('----------------------');
