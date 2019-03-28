@@ -97,6 +97,7 @@ class DistGenerator {
             langsMapObj,
             markup.newLine,
             markup.newLine,
+            markup.tsLintDisableLength,
             resxObj,
             markup.newLine,
             markup.newLine,

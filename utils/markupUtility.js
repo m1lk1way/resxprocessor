@@ -26,6 +26,10 @@ class MarkupUtility {
         return `// tslint:disable${this.i_newLine}`;
     }
 
+    get tsLintDisableLength() {
+        return `/* tslint:disable: max-line-length */${this.i_newLine}`;
+    }
+
     set tab(tab) {
         this.i_tab = tab;
     }
