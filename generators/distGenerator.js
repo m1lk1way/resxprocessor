@@ -100,7 +100,9 @@ class DistGenerator {
             resxObj,
             markup.newLine,
             markup.newLine,
+            markup.tsIgnore,
             this.genNameSpaceAssign(),
+            markup.newLine,
             nameSpaceAssign,
         ].join('');
 
