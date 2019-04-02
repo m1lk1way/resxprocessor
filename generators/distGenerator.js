@@ -39,7 +39,7 @@ class DistGenerator {
 
     genLangsMapObj(chunk) {
         const mapObjBody = this.languages.map(l => `${markup.tab}${l}: ${chunk}${l},`).join(markup.newLine);
-        const langsMapObj = `const langMap: {[k: string]: typeof ${chunk}${this.defaultLang}} = {${markup.newLine}${mapObjBody}${markup.newLine}};`;
+        const langsMapObj = `const langMap: { [k: string]: Partial<typeof ${chunk}${this.defaultLang}> } = {${markup.newLine}${mapObjBody}${markup.newLine}};`;
         return langsMapObj;
     }
 
