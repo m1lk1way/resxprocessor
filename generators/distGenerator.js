@@ -4,6 +4,7 @@ const jsStringEscape = require('js-string-escape');
 const LogUtility = require('../utils/logUtility');
 const PathUtility = require('../utils/pathUtility');
 const MarkupUtility = require('../utils/markupUtility');
+const SortUtility = require('../utils/sortUtility');
 const fsOptions = require('../utils/fsOptions');
 
 const readFileAsync = promisify(fs.readFile);
@@ -24,7 +25,7 @@ class DistGenerator {
     }
 
     static genResxStrs(json) {
-        const keys = Object.keys(json).sort();
+        const keys = Object.keys(SortUtility.sort(json));
         return keys.map(k => `${markup.tab}${k}: '${jsStringEscape(json[k])}',`);
     }
 
@@ -38,7 +39,7 @@ class DistGenerator {
 
     genLangsMapObj(chunk) {
         const mapObjBody = this.languages.map(l => `${markup.tab}${l}: ${chunk}${l},`).join(markup.newLine);
-        const langsMapObj = `const langMap: {[k: string]: any} = {${markup.newLine}${mapObjBody}${markup.newLine}};`;
+        const langsMapObj = `const langMap: {[k: string]: typeof ${chunk}${this.defaultLang}} = {${markup.newLine}${mapObjBody}${markup.newLine}};`;
         return langsMapObj;
     }
 
@@ -55,41 +56,51 @@ class DistGenerator {
             }, {});
 
         const strings = DistGenerator.genResxStrs(keyValPairsToGenerate);
-
+        const resxObj = DistGenerator.genResxObj(strings.join(markup.newLine), name);
         return [
             markup.autoGenStr,
             markup.newLine,
-            DistGenerator.genResxObj(strings.join(markup.newLine), name),
+            resxObj,
         ].join('');
     }
 
     static processJsonToJs(body, filePath) {
-        return writeFileAsync(filePath, body + markup.newLine, fsOptions.write);
+        const fileBody = body + markup.newLine;
+        return writeFileAsync(filePath, fileBody, fsOptions.write);
     }
 
-    static getSortedSrcKeys(fileData) {
-        return Object.keys(JSON.parse(fileData)).sort();
+    static getSortedKeys(fileData) {
+        const json = JSON.parse(fileData);
+        const sortedJson = SortUtility.sort(json);
+
+        return Object.keys(sortedJson);
     }
 
-    static genResxGetterStrs(keys, defaultLang, currentLangNS) {
+    static genResxGetterStrs(fileData, defaultLang, currentLangNS) {
+        const json = JSON.parse(fileData);
+        const keys = SortUtility.getSortedKeys(json);
+        
         const strings = keys.map(k => (
             `${markup.tab}get ${k}() {${markup.newLine}${markup.tab}${markup.tab}return `
             + `langMap[${currentLangNS}].${k} || langMap.${defaultLang}.${k};${markup.newLine}${markup.tab}},`
         ));
+
         const ResxGetterStrs = strings.join(markup.newLine);
         return ResxGetterStrs;
     }
 
     genResxWrapperBody(fileData, chunkName) {
         const wrapperChunkName = chunkName + this.resxPrefix;
-        const keys = DistGenerator.getSortedSrcKeys(fileData); // use sort from sortUtility here
         const imports = DistGenerator.generateNamedImports(chunkName, this.languages, this.resxPrefix);
         const langsMapObj = this.genLangsMapObj(chunkName);
-        const content = DistGenerator.genResxGetterStrs(keys, this.defaultLang, this.currentLangNS);
+        const content = DistGenerator.genResxGetterStrs(fileData, this.defaultLang, this.currentLangNS);
         const resxObj = DistGenerator.genResxObj(content, wrapperChunkName);
+        const emptyNameSpace = this.genNameSpaceAssign();
         const nameSpaceAssign = this.genAssignToNameSpace(chunkName, wrapperChunkName);
+
         const body = [
             markup.autoGenStr,
+            markup.newLine,
             imports,
             markup.newLine,
             markup.newLine,
@@ -101,7 +112,7 @@ class DistGenerator {
             markup.newLine,
             markup.newLine,
             markup.tsIgnore,
-            this.genNameSpaceAssign(),
+            emptyNameSpace,
             markup.newLine,
             nameSpaceAssign,
         ].join('');
@@ -114,7 +125,7 @@ class DistGenerator {
     }
 
     static genIStrs(json) {
-        const keys = Object.keys(json).sort();
+        const keys = SortUtility.getSortedKeys(json);
         return keys.map(k => `${markup.tab}${k}: string;`);
     }
 
@@ -133,7 +144,7 @@ class DistGenerator {
     }
 
     genIObj(content, name) {
-        return `interface ${name}${this.resxPrefix} {${markup.newLine}${content}${markup.newLine}}`;
+        return `interface ${name}${this.resxPrefix} {${content ? markup.newLine + content + markup.newLine : ''}}`;
     }
 
     genTypesBody(name, data) {
@@ -159,7 +170,9 @@ class DistGenerator {
     generateTypes(srcLangFileData, chunkName) {
         const typePath = pathUtility.getDefTypesPath(chunkName);
         const typeBody = this.genTypesBody(chunkName, srcLangFileData);
-        return writeFileAsync(typePath, typeBody + markup.newLine, fsOptions.write);
+        const fileBody = typeBody + markup.newLine;
+
+        return writeFileAsync(typePath, fileBody, fsOptions.write);
     }
 
     generateChunk(chunkName, createMode) {

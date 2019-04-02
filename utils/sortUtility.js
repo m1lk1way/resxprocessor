@@ -9,6 +9,10 @@ class SortUtility {
 
         return sortedObj;
     }
+
+    static getSortedKeys(obj) {
+        return Object.keys(SortUtility.sort(obj));
+    }
 }
 
 module.exports = SortUtility;

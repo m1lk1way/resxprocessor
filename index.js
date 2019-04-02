@@ -7,7 +7,15 @@ const LogUtility = require('./utils/logUtility');
 const Markup = require('./utils/markupUtility');
 
 const initModule = ({
-    tabSize, srcFolder, distFolder, resxPrefix, jsNamespace, tsGlobInterface, languages, defaultLang, currentLangNS,
+    tabSize,
+    srcFolder,
+    distFolder,
+    resxPrefix,
+    jsNamespace,
+    tsGlobInterface,
+    languages,
+    defaultLang,
+    currentLangNS,
 }) => {
     /* utilities initialization */
     const pathUtility = new PathUtility();
@@ -52,6 +60,8 @@ const initModule = ({
             });
     };
 
+    const isValidJSName = name => name.trim().length && !(/^[^a-zA-Z_]+|[^a-zA-Z_0-9]+/).test(name);
+
     const beginInteraction = () => {
         const actions = {
             create: 'create',
@@ -76,7 +86,11 @@ const initModule = ({
                 when: a => a.action === actions.create,
                 validate: resxName => {
                     const exists = SrcGenerator.checkChunkExistance(resxName);
-                    return exists ? 'Resource file already exists' : true;
+                    const isValidName = isValidJSName(resxName);
+                    if (exists || !isValidName) {
+                        return exists ? 'Resource file already exists' : 'Resource file name isn\'t valid';
+                    }
+                    return true;
                 },
             },
         ];
@@ -96,9 +110,16 @@ const initModule = ({
                 type: 'input',
                 name: 'keyName',
                 message: 'Key name? ',
-                validate: a => {
+                validate: name => {
                     const fileContent = SrcGenerator.readDefaultLangChunk(resxName);
-                    return a in fileContent ? 'This key is already exists' : true;
+                    const isValidName = isValidJSName(name);
+                    const exists = name in fileContent;
+
+                    if (exists || !isValidName) {
+                        return exists ? 'This key is already exists' : 'Key name isn\'t valid';
+                    }
+                    
+                    return true;
                 },
             },
             {
@@ -140,7 +161,7 @@ const initModule = ({
             const askForValues = (keyName, keyLangs) => {
                 const langValPairs = [];
                 let iteration = 0;
-                
+
                 const askForValue = () => {
                     const currLang = keyLangs[iteration];
                     if (langValPairs.length < keyLangs.length) {
