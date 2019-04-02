@@ -10,6 +10,7 @@ const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
 
 const pathUtility = new PathUtility();
+const markupUtility = new Markup();
 
 class SrcGenerator {
     constructor(languages, defaultLang, srcFolder) {
@@ -60,8 +61,7 @@ class SrcGenerator {
                 LogUtility.logSection('regenerating src files');
                 const ops = chunks.map(chunkName => this.processChunk(chunkName));
                 return Promise.all(ops);
-            })
-            .catch(LogUtility.logErr);
+            });
     }
 
     generateEmptyChunk(chunkName) {
@@ -83,7 +83,16 @@ class SrcGenerator {
 
         return readFileAsync(defaultLangPath, { encoding: 'utf8' })
             .then(defaultLangData => {
-                const srcData = JSON.parse(defaultLangData);
+                let srcData;
+
+                try {
+                    srcData = JSON.parse(defaultLangData);
+                }
+                catch (err) {
+                    err.message = `${defaultLangPath}${markupUtility.newLine}${err.message}`;
+                    throw err;
+                }
+
                 mainLangData = SortUtility.sort(srcData);
                 mainLangKeys = Object.keys(mainLangData);
             })
@@ -103,7 +112,15 @@ class SrcGenerator {
                     }
                     return readFileAsync(filePath, { encoding: 'utf8' })
                         .then(currLangFiledata => {
-                            let langData = JSON.parse(currLangFiledata);
+                            let langData;
+                            try {
+                                langData = JSON.parse(currLangFiledata);
+                            }
+                            catch (err) {
+                                err.message = `${filePath}${markupUtility.newLine}${err.message}`;
+                                throw err;
+                            }
+
                             const langDataKeys = Object.keys(langData);
                             const absentKeys = mainLangKeys.filter(k => !(k in langData));
                             

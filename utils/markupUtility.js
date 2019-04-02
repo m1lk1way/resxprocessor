@@ -48,6 +48,18 @@ class MarkupUtility {
         const dataString = JSON.stringify(json, null, 4);
         return dataString.replace(/\n/g, os.EOL);
     }
+
+    static parseToJson(string, path) {
+        let json;
+        try {
+            json = JSON.parse(string);
+        }
+        catch (err) {
+            err.message = `${path}${os.EOL}${err.message}`;
+            throw err;
+        }
+        return json;
+    }
 }
 
 module.exports = MarkupUtility;

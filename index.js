@@ -137,6 +137,7 @@ const initModule = ({
 
         const doAdd = (chunkName, keyName, langValPairs) => {
             SrcGenerator.addKey(chunkName, keyName, langValPairs)
+                .then(() => srcGenerator.processChunk(chunkName))
                 .then(() => distGenerator.generateChunk(chunkName, 'updated'))
                 .then(() => {
                     inquirer
@@ -220,7 +221,8 @@ const initModule = ({
         const createScenario = resxName => {
             srcGenerator.generateEmptyChunk(resxName)
                 .then(() => distGenerator.generateChunk(resxName, 'created'))
-                .then(() => askForAddKeys(resxName));
+                .then(() => askForAddKeys(resxName))
+                .catch(LogUtility.logErr);
         };
 
         const createSelectChunkQuestion = chunkNames => {

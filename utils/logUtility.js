@@ -2,7 +2,7 @@ const colors = require('colors');
 
 class LogUtility {
     static logErr(err) {
-        console.log(colors.red(`ERROR: ${err}, \r\n${err.stack}`));
+        console.log(colors.red(`ERROR: ${err}`));
     }
     
     static logLine() {

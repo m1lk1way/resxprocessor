@@ -76,9 +76,8 @@ class DistGenerator {
         return Object.keys(sortedJson);
     }
 
-    static genResxGetterStrs(fileData, defaultLang, currentLangNS) {
-        const json = JSON.parse(fileData);
-        const keys = SortUtility.getSortedKeys(json);
+    static genResxGetterStrs(srcJson, defaultLang, currentLangNS) {
+        const keys = SortUtility.getSortedKeys(srcJson);
         
         const strings = keys.map(k => (
             `${markup.tab}get ${k}() {${markup.newLine}${markup.tab}${markup.tab}return `
@@ -89,11 +88,11 @@ class DistGenerator {
         return ResxGetterStrs;
     }
 
-    genResxWrapperBody(fileData, chunkName) {
+    genResxWrapperBody(srcJson, chunkName) {
         const wrapperChunkName = chunkName + this.resxPrefix;
         const imports = DistGenerator.generateNamedImports(chunkName, this.languages, this.resxPrefix);
         const langsMapObj = this.genLangsMapObj(chunkName);
-        const content = DistGenerator.genResxGetterStrs(fileData, this.defaultLang, this.currentLangNS);
+        const content = DistGenerator.genResxGetterStrs(srcJson, this.defaultLang, this.currentLangNS);
         const resxObj = DistGenerator.genResxObj(content, wrapperChunkName);
         const emptyNameSpace = this.genNameSpaceAssign();
         const nameSpaceAssign = this.genAssignToNameSpace(chunkName, wrapperChunkName);
@@ -147,9 +146,8 @@ class DistGenerator {
         return `interface ${name}${this.resxPrefix} {${content ? markup.newLine + content + markup.newLine : ''}}`;
     }
 
-    genTypesBody(name, data) {
-        const content = JSON.parse(data);
-        const strings = DistGenerator.genIStrs(content);
+    genTypesBody(name, srcJson) {
+        const strings = DistGenerator.genIStrs(srcJson);
         return [
             markup.autoGenStr,
             markup.tsLintDisable,
@@ -161,15 +159,15 @@ class DistGenerator {
         ].join('');
     }
 
-    generateChunkWrapper(srcLangFileData, chunkName) {
-        const resxWrapperBody = this.genResxWrapperBody(srcLangFileData, chunkName);
+    generateChunkWrapper(srcJson, chunkName) {
+        const resxWrapperBody = this.genResxWrapperBody(srcJson, chunkName);
         const filePath = pathUtility.getDistWrapperPath(chunkName);
         return DistGenerator.processJsonToJs(resxWrapperBody, filePath);
     }
 
-    generateTypes(srcLangFileData, chunkName) {
+    generateTypes(srcJson, chunkName) {
         const typePath = pathUtility.getDefTypesPath(chunkName);
-        const typeBody = this.genTypesBody(chunkName, srcLangFileData);
+        const typeBody = this.genTypesBody(chunkName, srcJson);
         const fileBody = typeBody + markup.newLine;
 
         return writeFileAsync(typePath, fileBody, fsOptions.write);
@@ -179,8 +177,9 @@ class DistGenerator {
         const chunkDefaultSrc = pathUtility.getDefSrcFilePath(chunkName);
         return readFileAsync(chunkDefaultSrc, { encoding: 'utf8' })
             .then(srcLangFileData => {
-                const wrapperRegenOp = this.generateChunkWrapper(srcLangFileData, chunkName);
-                const typesRegenOp = this.generateTypes(srcLangFileData, chunkName);
+                const srcJson = MarkupUtility.parseToJson(srcLangFileData, chunkDefaultSrc);
+                const wrapperRegenOp = this.generateChunkWrapper(srcJson, chunkName);
+                const typesRegenOp = this.generateTypes(srcJson, chunkName);
 
                 return Promise.all([wrapperRegenOp, typesRegenOp]);
             })
@@ -198,7 +197,7 @@ class DistGenerator {
 
             return readFileAsync(srcFilePath, { encoding: 'utf8' })
                 .then(srcLangFileData => {
-                    const langJSData = JSON.parse(srcLangFileData);
+                    const langJSData = MarkupUtility.parseToJson(srcLangFileData, srcFilePath);
                     const resxBody = DistGenerator.genResxDistBody(chunkName, langJSData);
                     const distFilePath = pathUtility.getDistFilePath(chunkName, lang);
                     return DistGenerator.processJsonToJs(resxBody, distFilePath);
