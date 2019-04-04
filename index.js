@@ -5,6 +5,7 @@ const SrcGenerator = require('./generators/srcGenerator');
 const PathUtility = require('./utils/pathUtility');
 const LogUtility = require('./utils/logUtility');
 const Markup = require('./utils/markupUtility');
+const SearchUtility = require('./utils/searchUtility');
 
 const initModule = ({
     tabSize,
@@ -25,6 +26,8 @@ const initModule = ({
 
     const srcGenerator = new SrcGenerator(languages, defaultLang, srcFolder);
     const distGenerator = new DistGenerator(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS);
+    
+    const searchUtility = new SearchUtility(languages);
     /* END */
     
     const generateAll = () => {
@@ -266,13 +269,17 @@ const initModule = ({
                 }
             });
     };
-
+    
     program
         .option('-d, --dogood', 'Doing everything GOOD')
+        .option('-s, --search', 'Search for value')
         .parse(process.argv);
 
     if (program.dogood) {
         generateAll();
+    }
+    else if (program.search) {
+        searchUtility.search('test');
     }
     else {
         beginInteraction();

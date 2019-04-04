@@ -33,7 +33,7 @@ class SrcGenerator {
         
         const ops = langsToAdd.map(lang => {
             const filePath = pathUtility.getSrcFilePath(chunkName, lang);
-            return readFileAsync(filePath, { encoding: 'utf8' })
+            return readFileAsync(filePath, fsOptions.jsonRead)
                 .then(langData => {
                     const content = JSON.parse(langData);
                     const langVal = langValPairs[lang];
@@ -81,7 +81,7 @@ class SrcGenerator {
         let mainLangData,
             mainLangKeys;
 
-        return readFileAsync(defaultLangPath, { encoding: 'utf8' })
+        return readFileAsync(defaultLangPath, fsOptions.jsonRead)
             .then(defaultLangData => {
                 let srcData;
 
@@ -110,7 +110,7 @@ class SrcGenerator {
                             .then(() => LogUtility.logSuccess(filePath))
                             .catch(LogUtility.logErr);
                     }
-                    return readFileAsync(filePath, { encoding: 'utf8' })
+                    return readFileAsync(filePath, fsOptions.jsonRead)
                         .then(currLangFiledata => {
                             let langData;
                             try {
