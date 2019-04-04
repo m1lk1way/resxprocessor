@@ -112,6 +112,7 @@ class DistGenerator {
             markup.tsIgnore,
             emptyNameSpace,
             markup.newLine,
+            markup.tsIgnore,
             nameSpaceAssign,
         ].join('');
 

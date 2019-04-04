@@ -52,10 +52,6 @@ class PathUtility {
         return this.getDistFilePath(chunkName, this.defaultLang);
     }
 
-    getDefTypesPath(chunkName) { // Todo: delete this
-        return `${this.distFolder}${chunkName}${this.resxPrefix}.def.d.ts`;
-    }
-
     static getChunkByFileName(fileName) {
         return fileName.split('.')[0];
     }
