@@ -281,4 +281,4 @@ const initModule = ({
 
 module.exports = initModule;
 
-// todo: fix interactive mode and move all questions to its own utility;
+// todo: Move all questions to its own utility to make index.js clean and simple for understanding;
