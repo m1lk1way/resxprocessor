@@ -14,14 +14,13 @@ const pathUtility = new PathUtility();
 const markup = new MarkupUtility();
 
 class DistGenerator {
-    constructor(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS, tsGlobInterface) {
+    constructor(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS) {
         this.jsNamespace = jsNamespace;
         this.languages = languages;
         this.defaultLang = defaultLang;
         this.resxPrefix = resxPrefix;
         this.srcFolder = srcFolder;
         this.currentLangNS = currentLangNS;
-        this.tsGlobInterface = tsGlobInterface;
     }
 
     static genResxStrs(json) {
@@ -113,6 +112,7 @@ class DistGenerator {
             markup.tsIgnore,
             emptyNameSpace,
             markup.newLine,
+            markup.tsIgnore,
             nameSpaceAssign,
         ].join('');
 
@@ -121,11 +121,6 @@ class DistGenerator {
 
     static generateNamedImports(chunkName, languages, resxPrefix) {
         return languages.sort().map(l => `import { ${chunkName} as ${chunkName}${l} } from './${chunkName}${resxPrefix}.${l}';`).join(markup.newLine);
-    }
-
-    static genIStrs(json) {
-        const keys = SortUtility.getSortedKeys(json);
-        return keys.map(k => `${markup.tab}${k}: string;`);
     }
 
     generateAll() {
@@ -138,39 +133,10 @@ class DistGenerator {
             .catch(LogUtility.logErr);
     }
 
-    genIGlob(chunkName) {
-        return `declare interface ${this.tsGlobInterface} {${markup.newLine}${markup.tab}${chunkName}: ${chunkName}${this.resxPrefix};${markup.newLine}}`;
-    }
-
-    genIObj(content, name) {
-        return `interface ${name}${this.resxPrefix} {${content ? markup.newLine + content + markup.newLine : ''}}`;
-    }
-
-    genTypesBody(name, srcJson) {
-        const strings = DistGenerator.genIStrs(srcJson);
-        return [
-            markup.autoGenStr,
-            markup.tsLintDisable,
-            markup.newLine,
-            this.genIObj(strings.join(markup.newLine), name),
-            markup.newLine,
-            markup.newLine,
-            this.genIGlob(name),
-        ].join('');
-    }
-
     generateChunkWrapper(srcJson, chunkName) {
         const resxWrapperBody = this.genResxWrapperBody(srcJson, chunkName);
         const filePath = pathUtility.getDistWrapperPath(chunkName);
         return DistGenerator.processJsonToJs(resxWrapperBody, filePath);
-    }
-
-    generateTypes(srcJson, chunkName) {
-        const typePath = pathUtility.getDefTypesPath(chunkName);
-        const typeBody = this.genTypesBody(chunkName, srcJson);
-        const fileBody = typeBody + markup.newLine;
-
-        return writeFileAsync(typePath, fileBody, fsOptions.write);
     }
 
     generateChunk(chunkName, createMode) {
@@ -178,10 +144,7 @@ class DistGenerator {
         return readFileAsync(chunkDefaultSrc, { encoding: 'utf8' })
             .then(srcLangFileData => {
                 const srcJson = MarkupUtility.parseToJson(srcLangFileData, chunkDefaultSrc);
-                const wrapperRegenOp = this.generateChunkWrapper(srcJson, chunkName);
-                const typesRegenOp = this.generateTypes(srcJson, chunkName);
-
-                return Promise.all([wrapperRegenOp, typesRegenOp]);
+                return this.generateChunkWrapper(srcJson, chunkName);
             })
             .then(() => this.generateChunkLangs(chunkName))
             .then(() => {
