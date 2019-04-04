@@ -12,7 +12,6 @@ const initModule = ({
     distFolder,
     resxPrefix,
     jsNamespace,
-    tsGlobInterface,
     languages,
     defaultLang,
     currentLangNS,
@@ -25,7 +24,7 @@ const initModule = ({
     markupUtility.init(tabSize);
 
     const srcGenerator = new SrcGenerator(languages, defaultLang, srcFolder);
-    const distGenerator = new DistGenerator(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS, tsGlobInterface);
+    const distGenerator = new DistGenerator(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS);
     /* END */
     
     const generateAll = () => {
