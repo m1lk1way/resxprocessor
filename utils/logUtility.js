@@ -8,6 +8,10 @@ class LogUtility {
     static logLine() {
         console.log('-----------------------');
     }
+    
+    static logSrcCreation(filePath) {
+        console.log(colors.yellow(`did'n find src file ${colors.white(filePath)} =-> created`));
+    }
 
     static logSuccess() {
         console.log(colors.green('-----------------------'));

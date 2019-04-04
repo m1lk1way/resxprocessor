@@ -107,7 +107,7 @@ class SrcGenerator {
                             return acc;
                         }, {});
                         return writeFileAsync(filePath, Markup.toSanitizedString(body), fsOptions.write)
-                            .then(() => LogUtility.logSuccess(filePath))
+                            .then(() => LogUtility.logSrcCreation(filePath))
                             .catch(LogUtility.logErr);
                     }
                     return readFileAsync(filePath, { encoding: 'utf8' })
