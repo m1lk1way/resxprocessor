@@ -1,6 +1,6 @@
 {
   "name": "resxprocessor",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "fast, powerfull resx -> js + ts language resource generator",
   "repository": {
     "type": "git",
