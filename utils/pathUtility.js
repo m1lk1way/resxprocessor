@@ -19,7 +19,8 @@ class PathUtility {
         this.srcFolder = srcFolder;
         this.distFolder = distFolder;
         this.resxPrefix = resxPrefix;
-        
+        this.cfgPath = `${process.cwd()}/.resxprocessor`;
+
         PathUtility.checkPathOrCreate(srcFolder);
         PathUtility.checkPathOrCreate(distFolder);
     }
@@ -61,13 +62,19 @@ class PathUtility {
             .filter((v, i, a) => a.indexOf(v) === i);
     }
 
-    readChunksNames() {
+    readChunksNames() { // move to src generator
         return readdirAsync(this.srcFolder)
             .then(fileNames => {
                 const chunks = PathUtility.getChunksNames(fileNames);
                 return chunks;
             })
             .catch(LogUtility.logErr);
+    }
+
+    readConfig() {
+        const config = fs.readFileSync(this.cfgPath, { encoding: 'utf8' });
+    
+        return JSON.parse(config);
     }
 }
 

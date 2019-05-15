@@ -13,8 +13,17 @@ const writeFileAsync = promisify(fs.writeFile);
 const pathUtility = new PathUtility();
 const markup = new MarkupUtility();
 
+let instance;
+
 class DistGenerator {
-    constructor(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS) {
+    constructor() {
+        if (instance) {
+            return instance;
+        }
+        instance = this;
+    }
+
+    init(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS) {
         this.jsNamespace = jsNamespace;
         this.languages = languages;
         this.defaultLang = defaultLang;

@@ -6,21 +6,51 @@ const SortUtility = require('../utils/sortUtility');
 const fsOptions = require('../utils/fsOptions');
 const Markup = require('../utils/markupUtility');
 
+const readDirAsync = promisify(fs.readdir);
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
 
 const pathUtility = new PathUtility();
 const markupUtility = new Markup();
 
+let instance;
 class SrcGenerator {
-    constructor(languages, defaultLang, srcFolder) {
+    constructor() {
+        if (instance) {
+            return instance;
+        }
+        instance = this;
+    }
+    
+    init(languages, defaultLang, srcFolder) {
         this.languages = languages;
         this.defaultLang = defaultLang;
         this.srcFolder = srcFolder;
     }
 
+    static getChunkKeys(chunkName) {
+        return Object.keys(SrcGenerator.readDefaultLangChunk(chunkName));
+    }
+
     static checkChunkExistance(chunkName) {
         return fs.existsSync(pathUtility.getDefSrcFilePath(chunkName));
+    }
+
+    readAllChunkData(chunkName) {
+        const chunkData = [];
+
+        const ops = this.languages.map(lang => {
+            const filePath = pathUtility.getSrcFilePath(chunkName, lang);
+            return readFileAsync(filePath, { encoding: 'utf8' })
+                .then(data => {
+                    const langData = JSON.parse(data);
+                    chunkData.push({ [lang]: langData });
+                })
+                .catch(LogUtility.logErr);
+        });
+
+        return Promise.all(ops)
+            .then(() => chunkData);
     }
 
     static readDefaultLangChunk(chunkName) {
@@ -159,6 +189,15 @@ class SrcGenerator {
                 });
                 
                 return Promise.all(operations);
+            })
+            .catch(LogUtility.logErr);
+    }
+
+    readChunksNames() {
+        return readDirAsync(this.srcFolder)
+            .then(fileNames => {
+                const chunks = PathUtility.getChunksNames(fileNames);
+                return chunks;
             })
             .catch(LogUtility.logErr);
     }

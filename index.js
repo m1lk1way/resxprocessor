@@ -23,8 +23,11 @@ const initModule = ({
     const markupUtility = new Markup();
     markupUtility.init(tabSize);
 
-    const srcGenerator = new SrcGenerator(languages, defaultLang, srcFolder);
-    const distGenerator = new DistGenerator(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS);
+    const srcGenerator = new SrcGenerator();
+    srcGenerator.init(languages, defaultLang, srcFolder);
+
+    const distGenerator = new DistGenerator();
+    distGenerator.init(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS)
     /* END */
     
     const generateAll = () => {
