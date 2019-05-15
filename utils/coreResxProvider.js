@@ -4,33 +4,38 @@ const parser = require('xml2json');
 
 class CoreResxFile {
     /**
-     * @param {String} fullPath 
-     * @param {String} resxRootPath 
+     * @param {String} fullPath
+     * @param {String} resxRootPath
      */
     constructor(fullPath, resxRootPath) {
         this.fullPath = fullPath;
         this.lang = this.getLang(fullPath.toLowerCase());
 
-        let name = fullPath.substring(resxRootPath.length + 1).toLowerCase();
-        this.name = name.replace(`.${this.lang}.`, ".");
+        const name = fullPath.substring(resxRootPath.length + 1).toLowerCase();
+        this.name = name.replace(`.${this.lang}.`, '.');
     }
 
     getContent() {
-        let resolve, reject;
-        let promise = new Promise((r, rej) => {
+        let resolve,
+            reject;
+
+        const promise = new Promise((r, rej) => {
             resolve = r;
             reject = rej;
         });
 
-        if(this._content) {
-            resolve(this._content);
-        }else {
+        if (this.content) {
+            resolve(this.content);
+        }
+
+        else {
             fs.readFile(this.fullPath, (err, fileContent) => {
-                if(err) {
+                if (err) {
                     reject(err);
-                } else {
-                    this._content = JSON.parse(parser.toJson(fileContent));
-                    resolve(this._content);
+                }
+                else {
+                    this.content = JSON.parse(parser.toJson(fileContent));
+                    resolve(this.content);
                 }
             });
         }
@@ -39,26 +44,26 @@ class CoreResxFile {
     }
 
     async getKeys() {
-        let content = await this.getContent();
+        const content = await this.getContent();
         return content.root.data.map(x => x.name);
     }
 
     async getKeyValue(key) {
-        let content = await this.getContent();
-        let node = content.root.data.find(x => x.name === key);
+        const content = await this.getContent();
+        const node = content.root.data.find(x => x.name === key);
         return node && node.value;
     }
 
     /**
-     * @param {String} path 
+     * @param {String} path
      */
     getLang(path) {
-        let regex = new RegExp(`\\.(\\w\\w)\\.resx$`)
-        let match = regex.exec(path);
-        if(match) {
+        const regex = new RegExp('\\.(\\w\\w)\\.resx$');
+        const match = regex.exec(path);
+        if (match) {
             return match[1].toLowerCase();
         }
-        return "en";
+        return 'en';
     }
 
     toJSON() {
@@ -68,33 +73,37 @@ class CoreResxFile {
 
 class CoreResxProvider {
     /**
-     * @param {String} corePath 
+     * @param {String} corePath
      */
     constructor(corePath) {
-        this.corePath = corePath.replace(/\/$/, "");
+        this.corePath = corePath.replace(/\/$/, '');
         this.resxProjectPath = `${this.corePath}/LogicSoftware.EasyProjects.Resources`;
     }
-    
+
     /**
      * @returns {Promise<CoreResxFile[]>}
      */
-    readAllFiles()  {
-        let resolve, reject;
-        let promise = new Promise((r, rej) => {
+    readAllFiles() {
+        let resolve,
+            reject;
+
+        const promise = new Promise((r, rej) => {
             resolve = r;
             reject = rej;
         });
 
-        if(!this.files) {
+        if (!this.files) {
             glob(`${this.resxProjectPath}/**/*.resx`, null, (err, files) => {
-                if(err){
+                if (err) {
                     reject(err);
-                }else {
+                }
+                else {
                     this.files = files.map(f => new CoreResxFile(f, this.resxProjectPath));
                     resolve(this.files);
                 }
             });
-        } else {
+        }
+        else {
             resolve(this.files);
         }
         return promise;
@@ -105,17 +114,17 @@ class CoreResxProvider {
      * @returns {Promise<CoreResxFile[]>}
      */
     async getResxFiles() {
-        let files = await this.readAllFiles();
-        return files.filter(x => x.lang === "en");
+        const files = await this.readAllFiles();
+        return files.filter(x => x.lang === 'en');
     }
 
     /**
-     * 
-     * @param {String} name 
-     * @param {String} lang 
+     *
+     * @param {String} name
+     * @param {String} lang
      */
-    async getFile(name, lang = "en") {
-        let files = await this.readAllFiles();
+    async getFile(name, lang = 'en') {
+        const files = await this.readAllFiles();
         return files.find(x => x.name === name && x.lang === lang);
     }
 }
