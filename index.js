@@ -5,7 +5,6 @@ const SrcGenerator = require('./generators/srcGenerator');
 const PathUtility = require('./utils/pathUtility');
 const LogUtility = require('./utils/logUtility');
 const Markup = require('./utils/markupUtility');
-const CoreResxProvider = require('./utils/coreResxProvider');
 const migrateResxFromCoreCmd = require('./migrateFromCoreCmd');
 
 inquirer.registerPrompt('autocomplete', require('inquirer-autocomplete-prompt'));
