@@ -5,6 +5,10 @@ const SrcGenerator = require('./generators/srcGenerator');
 const PathUtility = require('./utils/pathUtility');
 const LogUtility = require('./utils/logUtility');
 const Markup = require('./utils/markupUtility');
+const CoreResxProvider = require('./utils/coreResxProvider');
+const migrateResxFromCoreCmd = require('./migrateFromCoreCmd');
+
+inquirer.registerPrompt('autocomplete', require('inquirer-autocomplete-prompt'));
 
 const initModule = ({
     tabSize,
@@ -66,12 +70,14 @@ const initModule = ({
             create: 'create',
             add: 'add',
             regenerateAll: 'regenerateAll',
+            migrateResxFromCore: 'migrateResxFromCore',
         };
 
         const actonsList = [
             { name: 'Do everything GOOD', value: actions.regenerateAll },
             { name: 'Create new resx', value: actions.create },
             { name: 'Add keys to existing one', value: actions.add },
+            { name: 'Migrate resx from core', value: actions.migrateResxFromCore },
         ];
 
         const startupQuestions = [
@@ -96,6 +102,17 @@ const initModule = ({
 
         const defaultSelectedLangs = [defaultLang, 'ru'];
         const langList = languages.map(l => ({ name: l }));
+        const langsQuestion = {
+            type: 'checkbox',
+            name: 'keyLangs',
+            message: 'Select languages:',
+            choices: langList,
+            default: defaultSelectedLangs,
+            validate: list => {
+                const isDefaultLangSelected = list.includes(defaultLang);
+                return isDefaultLangSelected ? true : `Default language (${defaultLang}) must be selected`;
+            },
+        };
 
         const doLangKeyValQuestions = (lang, keyName) => ({
             type: 'input',
@@ -121,23 +138,17 @@ const initModule = ({
                     return true;
                 },
             },
-            {
-                type: 'checkbox',
-                name: 'keyLangs',
-                message: 'Select languages:',
-                choices: langList,
-                default: defaultSelectedLangs,
-                validate: list => {
-                    const isDefaultLangSelected = list.includes(defaultLang);
-                    return isDefaultLangSelected ? true : `Default language (${defaultLang}) must be selected`;
-                },
-            },
+            langsQuestion,
         ];
 
-        const doAdd = (chunkName, keyName, langValPairs) => {
-            SrcGenerator.addKey(chunkName, keyName, langValPairs)
+        const addKeyToChunk = (chunkName, keyName, langValPairs) => {
+            return SrcGenerator.addKey(chunkName, keyName, langValPairs)
                 .then(() => srcGenerator.processChunk(chunkName))
                 .then(() => distGenerator.generateChunk(chunkName, 'updated'))
+        };
+
+        const doAdd = (chunkName, keyName, langValPairs) => {
+            addKeyToChunk(chunkName, keyName, langValPairs)
                 .then(() => {
                     inquirer
                         .prompt({
@@ -225,32 +236,42 @@ const initModule = ({
         };
 
         const createSelectChunkQuestion = chunkNames => {
-            const chunkList = chunkNames.map(chunkName => ({ name: chunkName }));
             return {
-                type: 'list',
+                type: 'autocomplete',
                 name: 'addKey',
                 message: 'Select resource: ',
-                choices: chunkList,
+                source: async (answers, input) => {
+                    return chunkNames.filter(x => !input || x.indexOf(input) >= 0)
+                },
             };
         };
 
         const readChunksAndAsk = () => {
-            pathUtility.readChunksNames()
-                .then(chunkNames => {
-                    if (!chunkNames.length) {
-                        LogUtility.logErr(`NO RESOURCES FOUND IN ${srcFolder}`);
-                        askForRecursiveActions();
-                        return;
-                    }
-                    const question = createSelectChunkQuestion(chunkNames);
-                    inquirer
-                        .prompt(question)
-                        .then(a => {
-                            addScenario(a.addKey);
-                        });
-                })
+            selectTargetResource()
+                .then(targetResource => addScenario(targetResource))
                 .catch(LogUtility.logErr);
         };
+
+        const selectTargetResource = async () => {
+            let chunkNames = await pathUtility.readChunksNames();
+            if (!chunkNames.length) {
+                LogUtility.logErr(`NO RESOURCES FOUND IN ${srcFolder}`);
+                askForRecursiveActions();
+                return;
+            }
+            const question = createSelectChunkQuestion(chunkNames);
+            let result = await inquirer.prompt(question);
+            return result.addKey;
+        }
+        
+        const migrateResxFromCore = () => migrateResxFromCoreCmd({
+            addKeyToChunk,
+            selectTargetResource,
+            langsQuestion,
+            yesNo,
+            yesNoList,
+            askForRecursiveActions,
+        });
 
         inquirer
             .prompt(startupQuestions)
@@ -263,6 +284,9 @@ const initModule = ({
                 }
                 if (a.action === actions.regenerateAll) {
                     generateAll();
+                }
+                if (a.action === actions.migrateResxFromCore) {
+                    migrateResxFromCore();
                 }
             });
     };
