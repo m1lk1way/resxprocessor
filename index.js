@@ -143,7 +143,7 @@ const initModule = ({
         const addKeyToChunk = (chunkName, keyName, langValPairs) => {
             return SrcGenerator.addKey(chunkName, keyName, langValPairs)
                 .then(() => srcGenerator.processChunk(chunkName))
-                .then(() => distGenerator.generateChunk(chunkName, 'updated'))
+                .then(() => distGenerator.generateChunk(chunkName, 'updated'));
         };
 
         const doAdd = (chunkName, keyName, langValPairs) => {
@@ -240,7 +240,7 @@ const initModule = ({
                 name: 'addKey',
                 message: 'Select resource: ',
                 source: async (answers, input) => {
-                    return chunkNames.filter(x => !input || x.indexOf(input) >= 0)
+                    return chunkNames.filter(x => !input || x.indexOf(input) >= 0);
                 },
             };
         };
@@ -252,16 +252,16 @@ const initModule = ({
         };
 
         const selectTargetResource = async () => {
-            let chunkNames = await pathUtility.readChunksNames();
+            const chunkNames = await pathUtility.readChunksNames();
             if (!chunkNames.length) {
                 LogUtility.logErr(`NO RESOURCES FOUND IN ${srcFolder}`);
                 askForRecursiveActions();
-                return;
+                return null;
             }
             const question = createSelectChunkQuestion(chunkNames);
-            let result = await inquirer.prompt(question);
+            const result = await inquirer.prompt(question);
             return result.addKey;
-        }
+        };
         
         const migrateResxFromCore = () => migrateResxFromCoreCmd({
             addKeyToChunk,

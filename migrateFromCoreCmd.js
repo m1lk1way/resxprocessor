@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop */
 const inquirer = require('inquirer');
 const CoreResxProvider = require('./utils/coreResxProvider');
 
@@ -9,58 +10,58 @@ const migrateResxFromCoreCmd = async ({
     yesNoList,
     askForRecursiveActions,
 }) => {
-    let corePath = (await inquirer.prompt({
+    const { corePath } = (await inquirer.prompt({
         type: 'input',
         message: 'Enter core project sources path',
         default: 'c:/projects/ep',
         name: 'corePath',
-    })).corePath;
-    let coreResxProvider = new CoreResxProvider(corePath);
+    }));
+    const coreResxProvider = new CoreResxProvider(corePath);
 
-    let coreResxFileName = (await inquirer.prompt({
-        type: "autocomplete",
+    const coreResxFileName = (await inquirer.prompt({
+        type: 'autocomplete',
         message: 'Select source (core) resx file: ',
-        name: "coreResxFile",
+        name: 'coreResxFile',
         source: async (answers, input) => {
-            let resxFiles = await coreResxProvider.getResxFiles();
+            const resxFiles = await coreResxProvider.getResxFiles();
             return resxFiles.filter(x => !input || x.name.indexOf(input) >= 0)
-                            .map( x => x.name)
-        }
+                .map(x => x.name);
+        },
     })).coreResxFile;
 
 
-    let targetResource = await selectTargetResource();
-    let langs = (await inquirer.prompt(langsQuestion)).keyLangs;
-    let coreResxFile = await coreResxProvider.getFile(coreResxFileName);
-    let sourceKeys = await coreResxFile.getKeys();
+    const targetResource = await selectTargetResource();
+    const langs = (await inquirer.prompt(langsQuestion)).keyLangs;
+    const coreResxFile = await coreResxProvider.getFile(coreResxFileName);
+    const sourceKeys = await coreResxFile.getKeys();
 
     let migrateOneMoreKey = yesNo.yes;
-    while(migrateOneMoreKey === yesNo.yes) {
-        let sourceKey = (await inquirer.prompt({
-            type: "autocomplete",
+    while (migrateOneMoreKey === yesNo.yes) {
+        const { sourceKey } = (await inquirer.prompt({
+            type: 'autocomplete',
             message: 'Select source (core) resx file: ',
-            name: "sourceKey",
+            name: 'sourceKey',
             source: async (answers, input) => {
-                return sourceKeys.filter(x => !input || x.toLowerCase().indexOf(input) >= 0)
-            }
-        })).sourceKey;
+                return sourceKeys.filter(x => !input || x.toLowerCase().indexOf(input) >= 0);
+            },
+        }));
 
-        let targetKey = (await inquirer.prompt({
+        const { targetKey } = await inquirer.prompt({
             type: 'input',
             message: 'Enter target key',
             default: sourceKey,
             name: 'targetKey',
-        })).targetKey;
+        });
 
         // migrating keys
-        let values = {};
+        const values = {};
         await Promise.all(langs.map(async lang => {
-            let coreFile = await coreResxProvider.getFile(coreResxFileName, lang);
-            if(!coreFile) {
+            const coreFile = await coreResxProvider.getFile(coreResxFileName, lang);
+            if (!coreFile) {
                 return;
             }
-            let keyValue = await coreFile.getKeyValue(sourceKey);
-            if(keyValue) {
+            const keyValue = await coreFile.getKeyValue(sourceKey);
+            if (keyValue) {
                 values[lang] = keyValue;
             }
         }));
@@ -68,6 +69,7 @@ const migrateResxFromCoreCmd = async ({
         await addKeyToChunk(targetResource, targetKey, values);
 
         // ask for migrating one more key
+        // eslint-disable-next-line prefer-destructuring
         migrateOneMoreKey = (await inquirer.prompt({
             type: 'list',
             name: 'migrateOneMoreKey',
