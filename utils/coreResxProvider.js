@@ -1,6 +1,6 @@
 const fs = require('fs');
 const glob = require('glob');
-const parser = require('xml2json');
+const { parseString } = require('xml2js');
 
 class CoreResxFile {
     /**
@@ -34,8 +34,16 @@ class CoreResxFile {
                     reject(err);
                 }
                 else {
-                    this.content = JSON.parse(parser.toJson(fileContent));
-                    resolve(this.content);
+                    const options = { trim: true, attrkey: 'attributes' };
+                    parseString(fileContent, options, (parseError, json) => {
+                        if (parseError) {
+                            reject(err);
+                        }
+                        else {
+                            this.content = json;
+                            resolve(this.content);
+                        }
+                    });
                 }
             });
         }
@@ -45,13 +53,13 @@ class CoreResxFile {
 
     async getKeys() {
         const content = await this.getContent();
-        return content.root.data.map(x => x.name);
+        return content.root.data.map(x => x.attributes.name);
     }
 
     async getKeyValue(key) {
         const content = await this.getContent();
-        const node = content.root.data.find(x => x.name === key);
-        return node && node.value;
+        const node = content.root.data.find(x => x.attributes.name === key);
+        return node && node.value[0];
     }
 
     /**
