@@ -39,7 +39,7 @@ const migrateResxFromCoreCmd = async ({
     while (migrateOneMoreKey === yesNo.yes) {
         const { sourceKey } = (await inquirer.prompt({
             type: 'autocomplete',
-            message: 'Select source (core) resx file: ',
+            message: 'Select source key: ',
             name: 'sourceKey',
             source: async (answers, input) => {
                 return sourceKeys.filter(x => !input || x.toLowerCase().indexOf(input) >= 0);
