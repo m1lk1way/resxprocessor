@@ -16,6 +16,8 @@
         "no-console": 0,
         "no-use-before-define": ["error", { "variables": false }],
         "max-len": ["error", { "code": 160 }],
-        "import/prefer-default-export": 0
+        "import/prefer-default-export": 0,
+        "class-methods-use-this": "off",
+        "arrow-body-style": "off"
     }
 }
