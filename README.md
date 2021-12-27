@@ -1,5 +1,6 @@
 # resxprocessor
 [![Build Status](https://travis-ci.org/m1lk1way/resxprocessor.svg?branch=master)](https://travis-ci.org/m1lk1way/resxprocessor)
+[![npm downloads](https://img.shields.io/npm/dt/resxprocessor?label=npm%20downloads)](https://www.npmjs.com/package/resxprocessor)
 
 This package offers you:
   - Create .json language source files by given languages (through configuration .resxprocessor)
