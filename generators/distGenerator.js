@@ -75,11 +75,18 @@ class DistGenerator {
         return Object.keys(sortedJson);
     }
 
+    static getCommentStr(text, defaultLang) {
+        return `${markup.tab}/**${markup.newLine}`
+        + `${markup.tab}* ${defaultLang}: ${text.replace("*/", "")}${markup.newLine}`
+        + `${markup.tab}*/${markup.newLine}`
+    }
+
     static genResxGetterStrs(srcJson, defaultLang, currentLangNS) {
         const keys = SortUtility.getSortedKeys(srcJson);
         
         const strings = keys.map(k => (
-            `${markup.tab}get ${k}() {${markup.newLine}${markup.tab}${markup.tab}return `
+            this.getCommentStr(srcJson[k], defaultLang)
+            + `${markup.tab}get ${k}() {${markup.newLine}${markup.tab}${markup.tab}return `
             + `langMap[${currentLangNS}].${k} || langMap.${defaultLang}.${k};${markup.newLine}${markup.tab}},`
         ));
 
