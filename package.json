@@ -21,12 +21,12 @@
   "dependencies": {
     "colors": "^1.3.3",
     "commander": "^2.19.0",
-    "inquirer": "^6.2.2",
+    "inquirer": "^13.2.1",
     "js-string-escape": "^1.0.1"
   },
   "devDependencies": {
-    "eslint": "^5.15.3",
-    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint": "^9.39.2",
+    "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.16.0"
   }
 }
