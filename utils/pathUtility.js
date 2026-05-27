@@ -1,6 +1,6 @@
-const fs = require('fs');
-const { promisify } = require('util');
-const LogUtility = require('../utils/logUtility');
+import fs from "fs";
+import { promisify } from "util";
+import LogUtility from "../utils/logUtility.js";
 
 const readdirAsync = promisify(fs.readdir);
 
@@ -19,7 +19,7 @@ class PathUtility {
         this.srcFolder = srcFolder;
         this.distFolder = distFolder;
         this.resxPrefix = resxPrefix;
-        
+
         PathUtility.checkPathOrCreate(srcFolder);
         PathUtility.checkPathOrCreate(distFolder);
     }
@@ -28,7 +28,7 @@ class PathUtility {
         if (!fs.existsSync(path)) {
             console.log(`didn't find ${path}, you specified in .resxprocessor cfg file`);
             fs.mkdirSync(path);
-            console.log('created it for you');
+            console.log("created it for you");
         }
     }
 
@@ -53,12 +53,11 @@ class PathUtility {
     }
 
     static getChunkByFileName(fileName) {
-        return fileName.split('.')[0];
+        return fileName.split(".")[0];
     }
 
     static getChunksNames(fileNames) {
-        return fileNames.map(PathUtility.getChunkByFileName)
-            .filter((v, i, a) => a.indexOf(v) === i);
+        return fileNames.map(PathUtility.getChunkByFileName).filter((v, i, a) => a.indexOf(v) === i);
     }
 
     readChunksNames() {
@@ -71,4 +70,4 @@ class PathUtility {
     }
 }
 
-module.exports = PathUtility;
+export default PathUtility;

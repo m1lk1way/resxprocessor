@@ -1,0 +1,5 @@
+node_modules/**/*
+.travis.yml
+.gitignore
+README.md
+package-lock.json

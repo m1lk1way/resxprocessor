@@ -1,16 +1,16 @@
-const fs = require('fs');
-const { promisify } = require('util');
-const LogUtility = require('../utils/logUtility');
-const PathUtility = require('../utils/pathUtility');
-const SortUtility = require('../utils/sortUtility');
-const fsOptions = require('../utils/fsOptions');
-const Markup = require('../utils/markupUtility');
+import fs from "fs";
+import { promisify } from "util";
+import LogUtility from "../utils/logUtility.js";
+import PathUtility from "../utils/pathUtility.js";
+import MarkupUtility from "../utils/markupUtility.js";
+import SortUtility from "../utils/sortUtility.js";
+import fsOptions from "../utils/fsOptions.js";
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
 
 const pathUtility = new PathUtility();
-const markupUtility = new Markup();
+const markup = new MarkupUtility();
 
 class SrcGenerator {
     constructor(languages, defaultLang, srcFolder) {
@@ -24,16 +24,16 @@ class SrcGenerator {
     }
 
     static readDefaultLangChunk(chunkName) {
-        const fileData = fs.readFileSync(pathUtility.getDefSrcFilePath(chunkName), 'utf8');
+        const fileData = fs.readFileSync(pathUtility.getDefSrcFilePath(chunkName), "utf8");
         return JSON.parse(fileData);
     }
 
     static addKey(chunkName, keyName, langValPairs) {
         const langsToAdd = Object.keys(langValPairs);
-        
+
         const ops = langsToAdd.map(lang => {
             const filePath = pathUtility.getSrcFilePath(chunkName, lang);
-            return readFileAsync(filePath, { encoding: 'utf8' })
+            return readFileAsync(filePath, { encoding: "utf8" })
                 .then(langData => {
                     const content = JSON.parse(langData);
                     const langVal = langValPairs[lang];
@@ -51,17 +51,15 @@ class SrcGenerator {
                 .catch(LogUtility.logErr);
         });
 
-        return Promise.all(ops)
-            .catch(LogUtility.logErr);
+        return Promise.all(ops).catch(LogUtility.logErr);
     }
-    
+
     generateAll() {
-        return pathUtility.readChunksNames()
-            .then(chunks => {
-                LogUtility.logSection('regenerating src files');
-                const ops = chunks.map(chunkName => this.processChunk(chunkName));
-                return Promise.all(ops);
-            });
+        return pathUtility.readChunksNames().then(chunks => {
+            LogUtility.logSection("regenerating src files");
+            const ops = chunks.map(chunkName => this.processChunk(chunkName));
+            return Promise.all(ops);
+        });
     }
 
     generateEmptyChunk(chunkName) {
@@ -70,26 +68,23 @@ class SrcGenerator {
             return writeFileAsync(filePath, JSON.stringify({}), fsOptions.write);
         });
 
-        return Promise.all(operations)
-            .then(() => {
-                LogUtility.logChunkOperation(chunkName, 'Src', 'created');
-            });
+        return Promise.all(operations).then(() => {
+            LogUtility.logChunkOperation(chunkName, "Src", "created");
+        });
     }
 
     processChunk(chunkName) {
         const defaultLangPath = pathUtility.getDefSrcFilePath(chunkName);
-        let mainLangData,
-            mainLangKeys;
+        let mainLangData, mainLangKeys;
 
-        return readFileAsync(defaultLangPath, { encoding: 'utf8' })
+        return readFileAsync(defaultLangPath, { encoding: "utf8" })
             .then(defaultLangData => {
                 let srcData;
 
                 try {
                     srcData = JSON.parse(defaultLangData);
-                }
-                catch (err) {
-                    err.message = `${defaultLangPath}${markupUtility.newLine}${err.message}`;
+                } catch (err) {
+                    err.message = `${defaultLangPath}${markup.newLine}${err.message}`;
                     throw err;
                 }
 
@@ -99,31 +94,29 @@ class SrcGenerator {
             .then(() => {
                 const operations = this.languages.map(currentLang => {
                     const filePath = pathUtility.getSrcFilePath(chunkName, currentLang);
-                    let extraKeys,
-                        hasExtraKeys;
+                    let extraKeys, hasExtraKeys;
                     if (!fs.existsSync(filePath)) {
                         const body = mainLangKeys.reduce((acc, v) => {
                             acc[v] = null;
                             return acc;
                         }, {});
-                        return writeFileAsync(filePath, Markup.toSanitizedString(body), fsOptions.write)
+                        return writeFileAsync(filePath, MarkupUtility.toSanitizedString(body), fsOptions.write)
                             .then(() => LogUtility.logSrcCreation(filePath))
                             .catch(LogUtility.logErr);
                     }
-                    return readFileAsync(filePath, { encoding: 'utf8' })
+                    return readFileAsync(filePath, { encoding: "utf8" })
                         .then(currLangFiledata => {
                             let langData;
                             try {
                                 langData = JSON.parse(currLangFiledata);
-                            }
-                            catch (err) {
-                                err.message = `${filePath}${markupUtility.newLine}${err.message}`;
+                            } catch (err) {
+                                err.message = `${filePath}${markup.newLine}${err.message}`;
                                 throw err;
                             }
 
                             const langDataKeys = Object.keys(langData);
                             const absentKeys = mainLangKeys.filter(k => !(k in langData));
-                            
+
                             extraKeys = langDataKeys.filter(k => !(k in mainLangData));
                             hasExtraKeys = !!extraKeys.length;
 
@@ -145,23 +138,25 @@ class SrcGenerator {
                             }
                             return SortUtility.sort(langData);
                         })
-                        .then(newLangData => writeFileAsync(filePath, Markup.toSanitizedString(newLangData), fsOptions.write))
+                        .then(newLangData =>
+                            writeFileAsync(filePath, MarkupUtility.toSanitizedString(newLangData), fsOptions.write),
+                        )
                         .then(() => {
                             if (hasExtraKeys) {
-                                console.log('----------------------');
+                                console.log("----------------------");
                                 console.log(`${filePath} - found extra keys`);
                                 extraKeys.forEach(LogUtility.logKeyDelete);
                                 LogUtility.logFileUpdate(filePath);
-                                console.log('----------------------');
+                                console.log("----------------------");
                             }
                         })
                         .catch(LogUtility.logErr);
                 });
-                
+
                 return Promise.all(operations);
             })
             .catch(LogUtility.logErr);
     }
 }
 
-module.exports = SrcGenerator;
+export default SrcGenerator;

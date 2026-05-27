@@ -1,10 +1,11 @@
-const inquirer = require('inquirer');
-const program = require('commander');
-const DistGenerator = require('./generators/distGenerator');
-const SrcGenerator = require('./generators/srcGenerator');
-const PathUtility = require('./utils/pathUtility');
-const LogUtility = require('./utils/logUtility');
-const Markup = require('./utils/markupUtility');
+import "colors";
+import inquirer from "inquirer";
+import { program } from "commander";
+import DistGenerator from "./generators/distGenerator.js";
+import SrcGenerator from "./generators/srcGenerator.js";
+import PathUtility from "./utils/pathUtility.js";
+import LogUtility from "./utils/logUtility.js";
+import Markup from "./utils/markupUtility.js";
 
 const initModule = ({
     tabSize,
@@ -26,30 +27,28 @@ const initModule = ({
     const srcGenerator = new SrcGenerator(languages, defaultLang, srcFolder);
     const distGenerator = new DistGenerator(jsNamespace, languages, defaultLang, resxPrefix, srcFolder, currentLangNS);
     /* END */
-    
+
     const generateAll = () => {
-        srcGenerator.generateAll()
+        srcGenerator
+            .generateAll()
             .then(() => distGenerator.generateAll())
             .then(() => LogUtility.logSuccess())
             .catch(LogUtility.logErr);
     };
 
     const yesNo = {
-        yes: 'Yes',
-        no: 'No',
+        yes: "Yes",
+        no: "No",
     };
 
-    const yesNoList = [
-        { name: yesNo.yes },
-        { name: yesNo.no },
-    ];
-        
+    const yesNoList = [{ name: yesNo.yes }, { name: yesNo.no }];
+
     const askForRecursiveActions = () => {
         inquirer
             .prompt({
-                type: 'list',
-                name: 'newKey',
-                message: 'Would you like to do something else?',
+                type: "select",
+                name: "newKey",
+                message: "Would you like to do something else?",
                 choices: yesNoList,
             })
             .then(a => {
@@ -59,72 +58,77 @@ const initModule = ({
             });
     };
 
-    const isValidJSName = name => name.trim().length && !(/^[^a-zA-Z_]+|[^a-zA-Z_0-9]+/).test(name);
+    const isValidJSName = name => name.trim().length && !/^[^a-zA-Z_]+|[^a-zA-Z_0-9]+/.test(name);
 
     const beginInteraction = () => {
         const actions = {
-            create: 'create',
-            add: 'add',
-            regenerateAll: 'regenerateAll',
+            create: "create",
+            add: "add",
+            regenerateAll: "regenerateAll",
+            quit: "quit",
         };
 
         const actonsList = [
-            { name: 'Do everything GOOD', value: actions.regenerateAll },
-            { name: 'Create new resx', value: actions.create },
-            { name: 'Add keys to existing one', value: actions.add },
+            { name: "Do everything GOOD", value: actions.regenerateAll },
+            { name: "Create new resx", value: actions.create },
+            { name: "Add keys to existing one", value: actions.add },
+            { name: "Quit", value: actions.quit },
         ];
 
         const startupQuestions = [
             {
-                type: 'list', name: 'action', message: 'Select operation?', choices: actonsList,
+                type: "select",
+                name: "action",
+                message: "Select operation?",
+                choices: actonsList,
             },
             {
-                type: 'input',
-                name: 'resxName',
-                message: 'Give it a name: ',
+                type: "input",
+                name: "resxName",
+                message: "Give it a name: ",
                 when: a => a.action === actions.create,
                 validate: resxName => {
                     const exists = SrcGenerator.checkChunkExistance(resxName);
                     const isValidName = isValidJSName(resxName);
                     if (exists || !isValidName) {
-                        return exists ? 'Resource file already exists' : 'Resource file name isn\'t valid';
+                        return exists ? "Resource file already exists" : "Resource file name isn't valid";
                     }
                     return true;
                 },
             },
         ];
 
-        const defaultSelectedLangs = [defaultLang, 'ru'];
+        const defaultSelectedLangs = [defaultLang, "ru"];
         const langList = languages.map(l => ({ name: l }));
 
         const doLangKeyValQuestions = (lang, keyName) => ({
-            type: 'input',
-            name: 'val',
+            type: "input",
+            name: "val",
             message: `'${lang}' value for '${keyName}'?`,
-            validate: a => (a ? true : 'Can\'t add empty value'),
+            validate: a => (a ? true : "Can't add empty value"),
         });
 
         const doAddScenarioQuestions = resxName => [
             {
-                type: 'input',
-                name: 'keyName',
-                message: 'Key name? ',
+                type: "input",
+                name: "keyName",
+                message: "Key name? ",
                 validate: name => {
                     const fileContent = SrcGenerator.readDefaultLangChunk(resxName);
                     const isValidName = isValidJSName(name);
                     const exists = name in fileContent;
 
                     if (exists || !isValidName) {
-                        return exists ? 'This key is already exists' : 'Key name isn\'t valid';
+                        return exists ? "This key is already exists" : "Key name isn't valid";
                     }
-                    
+
                     return true;
                 },
             },
             {
-                type: 'checkbox',
-                name: 'keyLangs',
-                message: 'Select languages:',
+                type: "checkbox",
+                name: "keyLangs",
+                message: "Select languages:",
                 choices: langList,
                 default: defaultSelectedLangs,
                 validate: list => {
@@ -137,13 +141,13 @@ const initModule = ({
         const doAdd = (chunkName, keyName, langValPairs) => {
             SrcGenerator.addKey(chunkName, keyName, langValPairs)
                 .then(() => srcGenerator.processChunk(chunkName))
-                .then(() => distGenerator.generateChunk(chunkName, 'updated'))
+                .then(() => distGenerator.generateChunk(chunkName, "updated"))
                 .then(() => {
                     inquirer
                         .prompt({
-                            type: 'list',
-                            name: 'newKey',
-                            message: 'add one more key?',
+                            type: "select",
+                            name: "newKey",
+                            message: "add one more key?",
                             choices: yesNoList,
                         })
                         .then(a => {
@@ -166,15 +170,12 @@ const initModule = ({
                     const currLang = keyLangs[iteration];
                     if (langValPairs.length < keyLangs.length) {
                         const question = doLangKeyValQuestions(currLang, keyName);
-                        inquirer
-                            .prompt(question)
-                            .then(a => {
-                                langValPairs.push({ [currLang]: a.val });
-                                iteration += 1;
-                                askForValue();
-                            });
-                    }
-                    else {
+                        inquirer.prompt(question).then(a => {
+                            langValPairs.push({ [currLang]: a.val });
+                            iteration += 1;
+                            askForValue();
+                        });
+                    } else {
                         const langData = langValPairs.reduce((acc, val) => {
                             const key = Object.keys(val)[0];
                             acc[key] = val[key];
@@ -189,22 +190,20 @@ const initModule = ({
             };
 
             const askForKey = () => {
-                inquirer
-                    .prompt(doAddScenarioQuestions(resxName))
-                    .then(a => {
-                        askForValues(a.keyName, a.keyLangs);
-                    });
+                inquirer.prompt(doAddScenarioQuestions(resxName)).then(a => {
+                    askForValues(a.keyName, a.keyLangs);
+                });
             };
-            
+
             askForKey();
         };
 
         const askForAddKeys = chunkName => {
             inquirer
                 .prompt({
-                    type: 'list',
-                    name: 'addKey',
-                    message: 'add keys??',
+                    type: "select",
+                    name: "addKey",
+                    message: "add keys??",
                     choices: yesNoList,
                 })
                 .then(a => {
@@ -218,8 +217,9 @@ const initModule = ({
         };
 
         const createScenario = resxName => {
-            srcGenerator.generateEmptyChunk(resxName)
-                .then(() => distGenerator.generateChunk(resxName, 'created'))
+            srcGenerator
+                .generateEmptyChunk(resxName)
+                .then(() => distGenerator.generateChunk(resxName, "created"))
                 .then(() => askForAddKeys(resxName))
                 .catch(LogUtility.logErr);
         };
@@ -227,15 +227,16 @@ const initModule = ({
         const createSelectChunkQuestion = chunkNames => {
             const chunkList = chunkNames.map(chunkName => ({ name: chunkName }));
             return {
-                type: 'list',
-                name: 'addKey',
-                message: 'Select resource: ',
+                type: "select",
+                name: "addKey",
+                message: "Select resource: ",
                 choices: chunkList,
             };
         };
 
         const readChunksAndAsk = () => {
-            pathUtility.readChunksNames()
+            pathUtility
+                .readChunksNames()
                 .then(chunkNames => {
                     if (!chunkNames.length) {
                         LogUtility.logErr(`NO RESOURCES FOUND IN ${srcFolder}`);
@@ -243,42 +244,45 @@ const initModule = ({
                         return;
                     }
                     const question = createSelectChunkQuestion(chunkNames);
-                    inquirer
-                        .prompt(question)
-                        .then(a => {
-                            addScenario(a.addKey);
-                        });
+                    inquirer.prompt(question).then(a => {
+                        addScenario(a.addKey);
+                    });
                 })
                 .catch(LogUtility.logErr);
         };
 
         inquirer
             .prompt(startupQuestions)
-            .then(a => {
-                if (a.action === actions.add) {
+            .then(answers => {
+                if (answers.action === actions.add) {
                     readChunksAndAsk();
                 }
-                if (a.action === actions.create) {
-                    createScenario(a.resxName);
+
+                if (answers.action === actions.create) {
+                    createScenario(answers.resxName);
                 }
-                if (a.action === actions.regenerateAll) {
+
+                if (answers.action === actions.regenerateAll) {
                     generateAll();
                 }
-            });
+
+                if (answers.action === actions.quit) {
+                    console.log("\nGoodbye!\n".yellow);
+                    process.exit(0);
+                }
+            })
+            .catch(LogUtility.logErr);
     };
 
-    program
-        .option('-d, --dogood', 'Doing everything GOOD')
-        .parse(process.argv);
+    const options = program.option("-d, --dogood", "Doing everything GOOD").parse(process.argv).opts();
 
-    if (program.dogood) {
+    if (options.dogood) {
         generateAll();
-    }
-    else {
+    } else {
         beginInteraction();
     }
 };
 
-module.exports = initModule;
+export default initModule;
 
 // todo: Move all questions to its own utility to make index.js clean and simple for understanding;

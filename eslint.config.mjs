@@ -1,0 +1,65 @@
+import js from "@eslint/js";
+import globals from "globals";
+import prettierConfig from "eslint-config-prettier";
+
+export default [
+    js.configs.recommended,
+
+    {
+        languageOptions: {
+            ecmaVersion: "latest",
+            sourceType: "module",
+            globals: {
+                ...globals.node,
+                ...globals.es2021,
+            },
+        },
+        rules: {
+            indent: "off",
+            "no-mixed-spaces-and-tabs": "off",
+            "linebreak-style": "off",
+            quotes: "off",
+            semi: "warn",
+            "no-unused-vars": "error",
+            "no-useless-escape": "off",
+            "no-extra-semi": "error",
+            "no-extra-boolean-cast": "off",
+            "space-infix-ops": ["error"],
+            complexity: "off",
+            "dot-notation": "off",
+            eqeqeq: ["error", "smart"],
+            "guard-for-in": "off",
+            "id-blacklist": "error",
+            "id-match": "error",
+            "max-classes-per-file": "off",
+            "no-bitwise": "error",
+            "no-caller": "error",
+            "no-case-declarations": "off",
+            "no-console": "off",
+            "no-eval": "error",
+            "no-else-return": "error",
+            "no-invalid-this": "off",
+            "no-new-wrappers": "error",
+            "no-process-env": "off",
+            "no-prototype-builtins": "off",
+            "no-restricted-imports": ["error"],
+            "no-shadow": "off",
+            "no-throw-literal": "error",
+            "no-undef-init": "error",
+            "no-underscore-dangle": "off",
+            "no-use-before-define": "off",
+            "object-shorthand": "error",
+            "one-var": ["off", "never"],
+            "prefer-arrow/prefer-arrow-functions": "off",
+            "prefer-const": "off",
+            "prefer-rest-params": "off",
+            "prefer-spread": "off",
+            radix: "error",
+            "spaced-comment": ["off", "always", { markers: ["/"] }],
+            ...prettierConfig.rules,
+        },
+    },
+    {
+        ignores: ["node_modules/"],
+    },
+];

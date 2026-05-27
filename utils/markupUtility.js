@@ -1,4 +1,4 @@
-const os = require('os');
+import os from "os";
 
 let instance;
 
@@ -12,7 +12,7 @@ class MarkupUtility {
     }
 
     init(tabSize) {
-        const tab = new Array(parseInt(tabSize, 10) + 1).join(' ');
+        const tab = new Array(parseInt(tabSize, 10) + 1).join(" ");
         this.tab = tab;
     }
 
@@ -53,8 +53,7 @@ class MarkupUtility {
         let json;
         try {
             json = JSON.parse(string);
-        }
-        catch (err) {
+        } catch (err) {
             err.message = `${path}${os.EOL}${err.message}`;
             throw err;
         }
@@ -62,4 +61,4 @@ class MarkupUtility {
     }
 }
 
-module.exports = MarkupUtility;
+export default MarkupUtility;
