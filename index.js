@@ -1,5 +1,7 @@
 import "colors";
 import inquirer from "inquirer";
+import { search as searchPrompt } from "@inquirer/prompts";
+import checkboxPlus from "inquirer-checkbox-plus-plus";
 import { program } from "commander";
 import DistGenerator from "./generators/distGenerator.js";
 import SrcGenerator from "./generators/srcGenerator.js";
@@ -64,6 +66,7 @@ const initModule = ({
         const actions = {
             create: "create",
             add: "add",
+            move: "move",
             regenerateAll: "regenerateAll",
             quit: "quit",
         };
@@ -72,6 +75,7 @@ const initModule = ({
             { name: "Do everything GOOD", value: actions.regenerateAll },
             { name: "Create new resx", value: actions.create },
             { name: "Add keys to existing one", value: actions.add },
+            { name: "Move keys to another resource file", value: actions.move },
             { name: "Quit", value: actions.quit },
         ];
 
@@ -132,7 +136,7 @@ const initModule = ({
                 choices: langList,
                 default: defaultSelectedLangs,
                 validate: list => {
-                    const isDefaultLangSelected = list.includes(defaultLang);
+                    const isDefaultLangSelected = list.map(x => x.value).includes(defaultLang);
                     return isDefaultLangSelected ? true : `Default language (${defaultLang}) must be selected`;
                 },
             },
@@ -216,6 +220,14 @@ const initModule = ({
                 });
         };
 
+        const updateAffectedChunks = chunkNames => {
+            const uniqueChunkNames = [...new Set(chunkNames)];
+
+            return Promise.all(uniqueChunkNames.map(chunkName => srcGenerator.processChunk(chunkName))).then(() =>
+                Promise.all(uniqueChunkNames.map(chunkName => distGenerator.generateChunk(chunkName, "updated"))),
+            );
+        };
+
         const createScenario = resxName => {
             srcGenerator
                 .generateEmptyChunk(resxName)
@@ -224,14 +236,55 @@ const initModule = ({
                 .catch(LogUtility.logErr);
         };
 
-        const createSelectChunkQuestion = chunkNames => {
-            const chunkList = chunkNames.map(chunkName => ({ name: chunkName }));
-            return {
-                type: "select",
-                name: "addKey",
-                message: "Select resource: ",
-                choices: chunkList,
+        const askForChunkSelection = async (message, chunkNames) => {
+            const normalizedChunkNames = [...chunkNames].sort((a, b) => a.localeCompare(b));
+
+            return searchPrompt({
+                message,
+                pageSize: 12,
+                source: async term => {
+                    const searchValue = (term || "").trim().toLowerCase();
+                    const matchingChunks = normalizedChunkNames.filter(
+                        chunkName => !searchValue || chunkName.toLowerCase().includes(searchValue),
+                    );
+
+                    return matchingChunks.length
+                        ? matchingChunks.map(chunkName => ({
+                              name: chunkName,
+                              value: chunkName,
+                          }))
+                        : [
+                              {
+                                  name: `No resources found for \"${term || ""}\"`,
+                                  value: "__no_results__",
+                                  disabled: true,
+                              },
+                          ];
+                },
+            });
+        };
+
+        const askForMoveKeySelection = sourceKeys => {
+            const filteredChoices = input => {
+                const searchValue = (input || "").trim().toLowerCase();
+                return sourceKeys
+                    .filter(key => !searchValue || key.toLowerCase().includes(searchValue))
+                    .map(key => ({
+                        name: key,
+                        value: key,
+                    }));
             };
+
+            return checkboxPlus({
+                message: "Select key(s) to move:",
+                searchable: true,
+                highlight: true,
+                pageSize: 12,
+                required: true,
+                instructions: "Type to filter, use space to select keys, then press Enter.",
+                validate: selectedKeys => (selectedKeys.length ? true : "Select at least one key to move"),
+                source: async (_, input) => filteredChoices(input),
+            });
         };
 
         const readChunksAndAsk = () => {
@@ -243,12 +296,118 @@ const initModule = ({
                         askForRecursiveActions();
                         return;
                     }
-                    const question = createSelectChunkQuestion(chunkNames);
-                    inquirer.prompt(question).then(a => {
-                        addScenario(a.addKey);
-                    });
+                    askForChunkSelection("Select resource: ", chunkNames).then(addScenario);
                 })
                 .catch(LogUtility.logErr);
+        };
+
+        const moveConflictActions = {
+            rename: "rename",
+            cancel: "cancel",
+        };
+
+        const askForMoveTargetKeyName = async (targetChunkName, keyName, reservedTargetKeyNames) => {
+
+            if (!reservedTargetKeyNames.has(keyName)) {
+                return keyName;
+            }
+
+            LogUtility.logMoveConflict(keyName);
+
+            const { conflictAction } = await inquirer.prompt({
+                type: "select",
+                name: "conflictAction",
+                message: "Choose how to continue:",
+                choices: [
+                    { name: "Provide a new key name", value: moveConflictActions.rename },
+                    { name: "Cancel", value: moveConflictActions.cancel },
+                ],
+            });
+
+            if (conflictAction === moveConflictActions.cancel) {
+                return null;
+            }
+
+            const { targetKeyName } = await inquirer.prompt({
+                type: "input",
+                name: "targetKeyName",
+                message: "New key name? ",
+                validate: name => {
+                    const isValidName = isValidJSName(name);
+                    const exists = reservedTargetKeyNames.has(name);
+
+                    if (exists || !isValidName) {
+                        return exists ? "This key is already exists" : "Key name isn't valid";
+                    }
+
+                    return true;
+                },
+            });
+
+            return targetKeyName;
+        };
+
+        const askForMoveTargetKeyMappings = async (targetChunkName, keyNames) => {
+            const targetChunkContent = SrcGenerator.readDefaultLangChunk(targetChunkName);
+            const reservedTargetKeyNames = new Set(Object.keys(targetChunkContent));
+            const keyMappings = [];
+
+            for (const keyName of keyNames) {
+                const targetKeyName = await askForMoveTargetKeyName(targetChunkName, keyName, reservedTargetKeyNames);
+
+                if (!targetKeyName) {
+                    return null;
+                }
+
+                reservedTargetKeyNames.add(targetKeyName);
+                keyMappings.push({
+                    sourceKeyName: keyName,
+                    targetKeyName,
+                });
+            }
+
+            return keyMappings;
+        };
+
+        const moveScenario = async () => {
+            try {
+                const chunkNames = (await pathUtility.readChunksNames()) || [];
+
+                if (chunkNames.length < 2) {
+                    LogUtility.logErr(`AT LEAST TWO RESOURCES REQUIRED IN ${srcFolder}`);
+                    askForRecursiveActions();
+                    return;
+                }
+
+                const sourceChunkName = await askForChunkSelection("Select source resource: ", chunkNames);
+                const sourceChunkContent = SrcGenerator.readDefaultLangChunk(sourceChunkName);
+                const sourceKeys = Object.keys(sourceChunkContent);
+
+                if (!sourceKeys.length) {
+                    LogUtility.logErr(`NO KEYS FOUND IN ${sourceChunkName}`);
+                    askForRecursiveActions();
+                    return;
+                }
+
+                const keyNames = await askForMoveKeySelection(sourceKeys);
+
+                const targetChunkNames = chunkNames.filter(chunkName => chunkName !== sourceChunkName);
+                const targetChunkName = await askForChunkSelection("Select target resource: ", targetChunkNames);
+                const keyMappings = await askForMoveTargetKeyMappings(targetChunkName, keyNames);
+
+                if (!keyMappings) {
+                    askForRecursiveActions();
+                    return;
+                }
+
+                await srcGenerator.moveKeys(sourceChunkName, targetChunkName, keyMappings);
+                await updateAffectedChunks([sourceChunkName, targetChunkName]);
+                LogUtility.logKeysMoveSuccess(keyMappings, targetChunkName);
+                askForRecursiveActions();
+            } catch (err) {
+                LogUtility.logErr(err);
+                askForRecursiveActions();
+            }
         };
 
         inquirer
@@ -256,6 +415,10 @@ const initModule = ({
             .then(answers => {
                 if (answers.action === actions.add) {
                     readChunksAndAsk();
+                }
+
+                if (answers.action === actions.move) {
+                    moveScenario();
                 }
 
                 if (answers.action === actions.create) {
@@ -267,7 +430,7 @@ const initModule = ({
                 }
 
                 if (answers.action === actions.quit) {
-                    console.log("\nGoodbye!\n".yellow);
+                    LogUtility.logQuit();
                     process.exit(0);
                 }
             })

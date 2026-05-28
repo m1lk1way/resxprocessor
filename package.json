@@ -10,7 +10,7 @@
         "resxprocessor": "./bin/global.js"
     },
     "engines": {
-        "node": ">=14.x"
+        "node": ">=18.0.0"
     },
     "main": "index.js",
     "type": "module",
@@ -24,16 +24,18 @@
     "author": "",
     "license": "MIT",
     "dependencies": {
+        "@inquirer/prompts": "^8.5.0",
         "colors": "^1.4.0",
         "commander": "^14.0.3",
         "globals": "^17.6.0",
         "inquirer": "^14.0.0",
+        "inquirer-checkbox-plus-plus": "^1.1.1",
         "js-string-escape": "^1.0.1"
     },
     "devDependencies": {
         "eslint": "^9.39.4",
-        "eslint-plugin-import": "^2.32.0",
         "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-import": "^2.32.0",
         "prettier": "^3.8.3"
     }
 }

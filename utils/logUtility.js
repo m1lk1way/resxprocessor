@@ -40,6 +40,31 @@ class LogUtility {
     static logKeyDelete(key) {
         console.log(`${key} - key was deleted`.red);
     }
+
+    static logMoveConflict(keyName) {
+        console.log(`Key "${keyName}" already exists in the target file.`.yellow);
+    }
+
+    static logKeyMoveSuccess(keyName, targetFile) {
+        console.log(`Successfully moved "${keyName}" to ${targetFile}.`.green);
+    }
+
+    static logKeysMoveSuccess(keyMappings, targetFile) {
+        if (keyMappings.length === 1) {
+            LogUtility.logKeyMoveSuccess(keyMappings[0].sourceKeyName, targetFile);
+            return;
+        }
+
+        const movedKeys = keyMappings.map(({ sourceKeyName, targetKeyName }) =>
+            sourceKeyName === targetKeyName ? sourceKeyName : `${sourceKeyName} -> ${targetKeyName}`,
+        );
+
+        console.log(`Successfully moved ${keyMappings.length} keys to ${targetFile}: ${movedKeys.join(", ")}.`.green);
+    }
+
+    static logQuit() {
+        console.log("\nGoodbye!\n".yellow);
+    }
 }
 
 export default LogUtility;

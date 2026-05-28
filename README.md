@@ -15,7 +15,7 @@ This package offers you:
 * [colors.js](https://github.com/Marak/colors.js) - get colors in your node.js console.
 
 ### Installation
-**resxprocessor** requires [Node.js](https://nodejs.org/) v6+ to run.
+**resxprocessor** requires [Node.js](https://nodejs.org/) v18+ to run.
 ```sh
 $ npm install resxprocessor -g
 ```

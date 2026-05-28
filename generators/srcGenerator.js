@@ -8,6 +8,7 @@ import fsOptions from "../utils/fsOptions.js";
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
+const unlinkAsync = promisify(fs.unlink);
 
 const pathUtility = new PathUtility();
 const markup = new MarkupUtility();
@@ -52,6 +53,188 @@ class SrcGenerator {
         });
 
         return Promise.all(ops).catch(LogUtility.logErr);
+    }
+
+    static readChunkFile(filePath) {
+        if (!fs.existsSync(filePath)) {
+            return Promise.resolve({
+                exists: false,
+                content: {},
+            });
+        }
+
+        return readFileAsync(filePath, { encoding: "utf8" }).then(fileData => ({
+            exists: true,
+            content: MarkupUtility.parseToJson(fileData, filePath),
+        }));
+    }
+
+    static writeChunkFile(filePath, content) {
+        return writeFileAsync(filePath, MarkupUtility.toSanitizedString(SortUtility.sort(content)), fsOptions.write);
+    }
+
+    static restoreChunkFile(filePath, snapshot) {
+        if (!snapshot.exists) {
+            if (!fs.existsSync(filePath)) {
+                return Promise.resolve();
+            }
+
+            return unlinkAsync(filePath).catch(err => {
+                if (err.code === "ENOENT") {
+                    return;
+                }
+
+                throw err;
+            });
+        }
+
+        return SrcGenerator.writeChunkFile(filePath, snapshot.content);
+    }
+
+    static normalizeMoveMappings(keyMappings) {
+        if (!Array.isArray(keyMappings) || !keyMappings.length) {
+            throw new Error("At least one key must be selected to move");
+        }
+
+        return keyMappings.map(({ sourceKeyName, targetKeyName = sourceKeyName }) => {
+            if (!sourceKeyName || !targetKeyName) {
+                throw new Error("Source and target key names are required for move operation");
+            }
+
+            return {
+                sourceKeyName,
+                targetKeyName,
+            };
+        });
+    }
+
+    async moveKeys(sourceChunkName, targetChunkName, keyMappings) {
+        if (sourceChunkName === targetChunkName) {
+            throw new Error("Source and target resource files must be different");
+        }
+
+        const normalizedMappings = SrcGenerator.normalizeMoveMappings(keyMappings);
+        const sourceKeyNames = normalizedMappings.map(mapping => mapping.sourceKeyName);
+        const targetKeyNames = normalizedMappings.map(mapping => mapping.targetKeyName);
+
+        if (new Set(sourceKeyNames).size !== sourceKeyNames.length) {
+            throw new Error("Source keys to move must be unique");
+        }
+
+        if (new Set(targetKeyNames).size !== targetKeyNames.length) {
+            throw new Error("Target key names must be unique");
+        }
+
+        const sourceDefaultData = SrcGenerator.readDefaultLangChunk(sourceChunkName);
+        sourceKeyNames.forEach(sourceKeyName => {
+            if (!(sourceKeyName in sourceDefaultData)) {
+                throw new Error(`Key \"${sourceKeyName}\" doesn't exist in source file`);
+            }
+        });
+
+        const targetDefaultData = SrcGenerator.readDefaultLangChunk(targetChunkName);
+        const reservedTargetKeys = new Set(Object.keys(targetDefaultData));
+
+        normalizedMappings.forEach(({ targetKeyName }) => {
+            if (reservedTargetKeys.has(targetKeyName)) {
+                throw new Error(`Key \"${targetKeyName}\" already exists in the target file`);
+            }
+
+            reservedTargetKeys.add(targetKeyName);
+        });
+
+        const operations = await Promise.all(
+            this.languages.map(async lang => {
+                const sourceFilePath = pathUtility.getSrcFilePath(sourceChunkName, lang);
+                const targetFilePath = pathUtility.getSrcFilePath(targetChunkName, lang);
+                const [sourceSnapshot, targetSnapshot] = await Promise.all([
+                    SrcGenerator.readChunkFile(sourceFilePath),
+                    SrcGenerator.readChunkFile(targetFilePath),
+                ]);
+                const nextTargetContent = {
+                    ...targetSnapshot.content,
+                };
+                const nextSourceContent = {
+                    ...sourceSnapshot.content,
+                };
+
+                normalizedMappings.forEach(({ sourceKeyName, targetKeyName }) => {
+                    const sourceHasKey = sourceKeyName in sourceSnapshot.content;
+
+                    nextTargetContent[targetKeyName] = sourceHasKey ? sourceSnapshot.content[sourceKeyName] : null;
+                    delete nextSourceContent[sourceKeyName];
+                });
+
+                return {
+                    sourceFilePath,
+                    targetFilePath,
+                    sourceSnapshot,
+                    targetSnapshot,
+                    nextSourceContent,
+                    nextTargetContent,
+                };
+            }),
+        );
+
+        const writtenTargets = [];
+        const writtenSources = [];
+
+        try {
+            for (const operation of operations) {
+                await SrcGenerator.writeChunkFile(operation.targetFilePath, operation.nextTargetContent);
+                writtenTargets.push(operation);
+            }
+
+            for (const operation of operations) {
+                await SrcGenerator.writeChunkFile(operation.sourceFilePath, operation.nextSourceContent);
+                writtenSources.push(operation);
+            }
+
+            return {
+                sourceChunkName,
+                targetChunkName,
+                keyMappings: normalizedMappings,
+            };
+        } catch (err) {
+            const rollbackErrors = [];
+
+            try {
+                await Promise.all(
+                    writtenSources.map(operation =>
+                        SrcGenerator.restoreChunkFile(operation.sourceFilePath, operation.sourceSnapshot),
+                    ),
+                );
+            } catch (rollbackErr) {
+                rollbackErrors.push(rollbackErr.message);
+            }
+
+            try {
+                await Promise.all(
+                    writtenTargets.map(operation =>
+                        SrcGenerator.restoreChunkFile(operation.targetFilePath, operation.targetSnapshot),
+                    ),
+                );
+            } catch (rollbackErr) {
+                rollbackErrors.push(rollbackErr.message);
+            }
+
+            if (rollbackErrors.length) {
+                err.message = `${err.message}${markup.newLine}Rollback failed:${markup.newLine}${rollbackErrors.join(markup.newLine)}`;
+            }
+
+            throw err;
+        }
+    }
+
+    async moveKey(sourceChunkName, sourceKeyName, targetChunkName, targetKeyName = sourceKeyName) {
+        await this.moveKeys(sourceChunkName, targetChunkName, [{ sourceKeyName, targetKeyName }]);
+
+        return {
+            sourceChunkName,
+            sourceKeyName,
+            targetChunkName,
+            targetKeyName,
+        };
     }
 
     generateAll() {
