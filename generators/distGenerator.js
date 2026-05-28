@@ -1,11 +1,11 @@
-const fs = require('fs');
-const { promisify } = require('util');
-const jsStringEscape = require('js-string-escape');
-const LogUtility = require('../utils/logUtility');
-const PathUtility = require('../utils/pathUtility');
-const MarkupUtility = require('../utils/markupUtility');
-const SortUtility = require('../utils/sortUtility');
-const fsOptions = require('../utils/fsOptions');
+import fs from "fs";
+import { promisify } from "util";
+import jsStringEscape from "js-string-escape";
+import LogUtility from "../utils/logUtility.js";
+import PathUtility from "../utils/pathUtility.js";
+import MarkupUtility from "../utils/markupUtility.js";
+import SortUtility from "../utils/sortUtility.js";
+import fsOptions from "../utils/fsOptions.js";
 
 const readFileAsync = promisify(fs.readFile);
 const writeFileAsync = promisify(fs.writeFile);
@@ -29,7 +29,7 @@ class DistGenerator {
     }
 
     static genResxObj(content, name) {
-        return `export const ${name} = {${content ? markup.newLine + content + markup.newLine : ''}};`;
+        return `export const ${name} = {${content ? markup.newLine + content + markup.newLine : ""}};`;
     }
 
     genNameSpaceAssign() {
@@ -56,11 +56,7 @@ class DistGenerator {
 
         const strings = DistGenerator.genResxStrs(keyValPairsToGenerate);
         const resxObj = DistGenerator.genResxObj(strings.join(markup.newLine), name);
-        return [
-            markup.autoGenStr,
-            markup.newLine,
-            resxObj,
-        ].join('');
+        return [markup.autoGenStr, markup.newLine, resxObj].join("");
     }
 
     static processJsonToJs(body, filePath) {
@@ -76,19 +72,22 @@ class DistGenerator {
     }
 
     static getCommentStr(text, defaultLang) {
-        return `${markup.tab}/**${markup.newLine}`
-        + `${markup.tab}* ${defaultLang}: ${text.replace("*/", "")}${markup.newLine}`
-        + `${markup.tab}*/${markup.newLine}`
+        return (
+            `${markup.tab}/**${markup.newLine}` +
+            `${markup.tab}* ${defaultLang}: ${text.replace("*/", "")}${markup.newLine}` +
+            `${markup.tab}*/${markup.newLine}`
+        );
     }
 
     static genResxGetterStrs(srcJson, defaultLang, currentLangNS) {
         const keys = SortUtility.getSortedKeys(srcJson);
-        
-        const strings = keys.map(k => (
-            this.getCommentStr(srcJson[k], defaultLang)
-            + `${markup.tab}get ${k}() {${markup.newLine}${markup.tab}${markup.tab}return `
-            + `langMap[${currentLangNS}].${k} || langMap.${defaultLang}.${k};${markup.newLine}${markup.tab}},`
-        ));
+
+        const strings = keys.map(
+            k =>
+                this.getCommentStr(srcJson[k], defaultLang) +
+                `${markup.tab}get ${k}() {${markup.newLine}${markup.tab}${markup.tab}return ` +
+                `langMap[${currentLangNS}].${k} || langMap.${defaultLang}.${k};${markup.newLine}${markup.tab}},`,
+        );
 
         const ResxGetterStrs = strings.join(markup.newLine);
         return ResxGetterStrs;
@@ -121,19 +120,23 @@ class DistGenerator {
             markup.newLine,
             markup.tsIgnore,
             nameSpaceAssign,
-        ].join('');
+        ].join("");
 
         return body;
     }
 
     static generateNamedImports(chunkName, languages, resxPrefix) {
-        return languages.sort().map(l => `import { ${chunkName} as ${chunkName}${l} } from './${chunkName}${resxPrefix}.${l}';`).join(markup.newLine);
+        return languages
+            .sort()
+            .map(l => `import { ${chunkName} as ${chunkName}${l} } from './${chunkName}${resxPrefix}.${l}';`)
+            .join(markup.newLine);
     }
 
     generateAll() {
-        return pathUtility.readChunksNames()
+        return pathUtility
+            .readChunksNames()
             .then(chunks => {
-                LogUtility.logSection('regenerating dist files');
+                LogUtility.logSection("regenerating dist files");
                 const ops = chunks.map(c => this.generateChunk(c));
                 return Promise.all(ops);
             })
@@ -148,7 +151,7 @@ class DistGenerator {
 
     generateChunk(chunkName, createMode) {
         const chunkDefaultSrc = pathUtility.getDefSrcFilePath(chunkName);
-        return readFileAsync(chunkDefaultSrc, { encoding: 'utf8' })
+        return readFileAsync(chunkDefaultSrc, { encoding: "utf8" })
             .then(srcLangFileData => {
                 const srcJson = MarkupUtility.parseToJson(srcLangFileData, chunkDefaultSrc);
                 return this.generateChunkWrapper(srcJson, chunkName);
@@ -156,7 +159,7 @@ class DistGenerator {
             .then(() => this.generateChunkLangs(chunkName))
             .then(() => {
                 if (createMode) {
-                    LogUtility.logChunkOperation(chunkName, 'Dist', createMode);
+                    LogUtility.logChunkOperation(chunkName, "Dist", createMode);
                 }
             });
     }
@@ -165,16 +168,15 @@ class DistGenerator {
         const operations = this.languages.map(lang => {
             const srcFilePath = pathUtility.getSrcFilePath(chunkName, lang);
 
-            return readFileAsync(srcFilePath, { encoding: 'utf8' })
-                .then(srcLangFileData => {
-                    const langJSData = MarkupUtility.parseToJson(srcLangFileData, srcFilePath);
-                    const resxBody = DistGenerator.genResxDistBody(chunkName, langJSData);
-                    const distFilePath = pathUtility.getDistFilePath(chunkName, lang);
-                    return DistGenerator.processJsonToJs(resxBody, distFilePath);
-                });
+            return readFileAsync(srcFilePath, { encoding: "utf8" }).then(srcLangFileData => {
+                const langJSData = MarkupUtility.parseToJson(srcLangFileData, srcFilePath);
+                const resxBody = DistGenerator.genResxDistBody(chunkName, langJSData);
+                const distFilePath = pathUtility.getDistFilePath(chunkName, lang);
+                return DistGenerator.processJsonToJs(resxBody, distFilePath);
+            });
         });
         return Promise.all(operations);
     }
 }
 
-module.exports = DistGenerator;
+export default DistGenerator;

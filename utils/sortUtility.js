@@ -15,4 +15,4 @@ class SortUtility {
     }
 }
 
-module.exports = SortUtility;
+export default SortUtility;
