@@ -12,6 +12,7 @@ It helps you:
 - generate dist resources from source JSON files (`[name].[lang].js`)
 - add new keys to existing resources
 - move one or multiple keys between resource files
+- move a key directly from the command line without interactive prompts
 
 ## Features added in the current branch
 
@@ -76,6 +77,14 @@ Field description:
 
 Run the CLI from the same directory where `.resxprocessor` is located.
 
+### Main CLI modes
+
+The top-level CLI modes are:
+
+- `--dogood`, `-d` - regenerate, sanitize, and sort all resources
+- `--move`, `-m` - move one or more keys between resource files without interactive prompts
+- `--help`, `-h` - show CLI help
+
 ### Interactive mode
 
 ```sh
@@ -107,6 +116,54 @@ The move flow allows you to:
 5. move values across all configured language JSON files in sync
 
 On success the CLI regenerates the affected source/dist outputs and prints a success message.
+
+### Direct move command
+
+You can also move keys without entering interactive mode by using `--move` (or `-m`):
+
+```sh
+resxprocessor --move --source common --key saveButton --target calendar
+```
+
+Move multiple keys at once:
+
+```sh
+resxprocessor -m -s common -k saveButton -k cancelButton -t calendar
+```
+
+You can also pass multiple keys as a comma-separated list:
+
+```sh
+resxprocessor -m -s common -k saveButton,cancelButton -t calendar
+```
+
+Rename while moving. When multiple keys are provided, `--new-key` values are matched by order:
+
+```sh
+resxprocessor -m -s common -k saveButton -k cancelButton -t calendar -n calendarSaveButton -n calendarCancelButton
+```
+
+Supported arguments:
+
+- `--move`, `-m` - run direct move mode
+- `--source`, `-s` - source resource name or file name (for example `common` or `common.en.json`)
+- `--key`, `-k` - key name to move; repeat the option or pass a comma-separated list for multiple keys
+- `--target`, `-t` - target resource name or file name
+- `--new-key`, `-n` - optional target key name; repeat the option or pass a comma-separated list to rename multiple keys by order
+
+Notes:
+
+- `--source`, `--key`, and `--target` are used together with `--move`
+- `--new-key` is optional
+- `--dogood` and `--move` are separate modes and should not be combined in one command
+
+The command moves all specified keys across configured language files, regenerates affected outputs, and fails safely if the move cannot be completed.
+
+Show CLI help:
+
+```sh
+resxprocessor --help
+```
 
 ### Batch regenerate mode
 

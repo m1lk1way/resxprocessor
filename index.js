@@ -1,8 +1,9 @@
 import "colors";
 import inquirer from "inquirer";
+import path from "path";
 import { search as searchPrompt } from "@inquirer/prompts";
 import checkboxPlus from "inquirer-checkbox-plus-plus";
-import { program } from "commander";
+import { Option, program } from "commander";
 import DistGenerator from "./generators/distGenerator.js";
 import SrcGenerator from "./generators/srcGenerator.js";
 import PathUtility from "./utils/pathUtility.js";
@@ -61,6 +62,93 @@ const initModule = ({
     };
 
     const isValidJSName = name => name.trim().length && !/^[^a-zA-Z_]+|[^a-zA-Z_0-9]+/.test(name);
+
+    const collectOptionValues = (value, previousValues) => [
+        ...previousValues,
+        ...value
+            .split(",")
+            .map(item => item.trim())
+            .filter(Boolean),
+    ];
+
+    const cliHelpText = [
+        "",
+        "Move options (use together with --move):",
+        "  -s, --source <file>  source resource name or file name",
+        "  -k, --key <key>      key name to move; repeat the option or use commas for multiple keys",
+        "  -t, --target <file>  target resource name or file name",
+        "  -n, --new-key <key>  optional target key name; repeat the option or use commas to map multiple keys by order",
+        "",
+    ].join("\n");
+
+    const normalizeChunkInput = chunkInput => PathUtility.getChunkByFileName(path.basename(chunkInput.trim()));
+
+    const resolveChunkName = (chunkInput, chunkNames, chunkRole) => {
+        const normalizedChunkName = normalizeChunkInput(chunkInput);
+
+        if (!normalizedChunkName || !chunkNames.includes(normalizedChunkName)) {
+            throw new Error(`${chunkRole} resource file "${chunkInput}" was not found in ${srcFolder}`);
+        }
+
+        return normalizedChunkName;
+    };
+
+    const runMoveOperation = async ({ sourceChunkName, targetChunkName, keyMappings }) => {
+        await srcGenerator.moveKeys(sourceChunkName, targetChunkName, keyMappings);
+        await updateAffectedChunks([sourceChunkName, targetChunkName]);
+        LogUtility.logKeysMoveSuccess(keyMappings, targetChunkName);
+    };
+
+    const runMoveCommand = async commandOptions => {
+        try {
+            const sourceKeyNames = commandOptions.key || [];
+            const targetKeyNames = commandOptions.newKey || [];
+
+            if (!commandOptions.source || !commandOptions.target || !sourceKeyNames.length) {
+                throw new Error("Move mode requires --source, --key, and --target");
+            }
+
+            if (targetKeyNames.length && targetKeyNames.length !== sourceKeyNames.length) {
+                throw new Error("Provide the same number of --new-key values as --key values, or omit --new-key");
+            }
+
+            const invalidKeyName = [...sourceKeyNames, ...targetKeyNames].find(keyName => !isValidJSName(keyName));
+
+            if (invalidKeyName) {
+                throw new Error(`Key name "${invalidKeyName}" isn't valid`);
+            }
+
+            const chunkNames = (await pathUtility.readChunksNames()) || [];
+
+            if (chunkNames.length < 2) {
+                throw new Error(`AT LEAST TWO RESOURCES REQUIRED IN ${srcFolder}`);
+            }
+
+            const sourceChunkName = resolveChunkName(commandOptions.source, chunkNames, "Source");
+            const targetChunkName = resolveChunkName(commandOptions.target, chunkNames, "Target");
+            const keyMappings = sourceKeyNames.map((sourceKeyName, index) => ({
+                sourceKeyName,
+                targetKeyName: targetKeyNames[index] || sourceKeyName,
+            }));
+
+            await runMoveOperation({
+                sourceChunkName,
+                targetChunkName,
+                keyMappings,
+            });
+        } catch (err) {
+            LogUtility.logErr(err);
+            process.exitCode = 1;
+        }
+    };
+
+    const updateAffectedChunks = chunkNames => {
+        const uniqueChunkNames = [...new Set(chunkNames)];
+
+        return Promise.all(uniqueChunkNames.map(chunkName => srcGenerator.processChunk(chunkName))).then(() =>
+            Promise.all(uniqueChunkNames.map(chunkName => distGenerator.generateChunk(chunkName, "updated"))),
+        );
+    };
 
     const beginInteraction = () => {
         const actions = {
@@ -218,14 +306,6 @@ const initModule = ({
                             return askForRecursiveActions();
                     }
                 });
-        };
-
-        const updateAffectedChunks = chunkNames => {
-            const uniqueChunkNames = [...new Set(chunkNames)];
-
-            return Promise.all(uniqueChunkNames.map(chunkName => srcGenerator.processChunk(chunkName))).then(() =>
-                Promise.all(uniqueChunkNames.map(chunkName => distGenerator.generateChunk(chunkName, "updated"))),
-            );
         };
 
         const createScenario = resxName => {
@@ -436,7 +516,54 @@ const initModule = ({
             .catch(LogUtility.logErr);
     };
 
-    const options = program.option("-d, --dogood", "Doing everything GOOD").parse(process.argv).opts();
+    const cliArgs = process.argv.slice(2);
+    const hasMoveMode = cliArgs.includes("-m") || cliArgs.includes("--move");
+
+    program
+        .name("resxprocessor")
+        .description("Manage JSON localization resources")
+        .option("-d, --dogood", "Doing everything GOOD")
+        .option("-m, --move", "Move key(s) from one resource file to another")
+        .addOption(new Option("-s, --source <file>", "source resource name or file name").hideHelp())
+        .addOption(
+            new Option("-k, --key <key>", "key name to move; repeat the option or use commas for multiple keys")
+                .default([])
+                .argParser((value, previousValues) => collectOptionValues(value, previousValues))
+                .hideHelp(),
+        )
+        .addOption(new Option("-t, --target <file>", "target resource name or file name").hideHelp())
+        .addOption(
+            new Option(
+                "-n, --new-key <key>",
+                "optional target key name; repeat the option or use commas to map multiple keys by order",
+            )
+                .default([])
+                .argParser((value, previousValues) => collectOptionValues(value, previousValues))
+                .hideHelp(),
+        )
+        .addHelpText("after", cliHelpText);
+
+    program.parse(process.argv);
+
+    const options = program.opts();
+    const hasMoveArguments = !!(options.source || options.target || options.key.length || options.newKey.length);
+
+    if (options.move || hasMoveMode) {
+        if (options.dogood) {
+            LogUtility.logErr("--dogood cannot be used together with --move");
+            process.exitCode = 1;
+            return;
+        }
+
+        runMoveCommand(options);
+        return;
+    }
+
+    if (hasMoveArguments) {
+        LogUtility.logErr("Use --move together with --source, --key, and --target");
+        process.exitCode = 1;
+        return;
+    }
 
     if (options.dogood) {
         generateAll();
