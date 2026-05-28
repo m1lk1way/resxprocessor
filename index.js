@@ -307,7 +307,6 @@ const initModule = ({
         };
 
         const askForMoveTargetKeyName = async (targetChunkName, keyName, reservedTargetKeyNames) => {
-
             if (!reservedTargetKeyNames.has(keyName)) {
                 return keyName;
             }
